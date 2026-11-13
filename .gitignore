@@ -1,0 +1,25 @@
+# Common to the Kevinjohn AdonisJS packages
+node_modules
+.pnpm-store/
+coverage
+.DS_Store
+.idea
+.vscode/
+*.log
+build
+dist
+package-lock.json
+.env
+.env.*
+!.env.example
+*.tgz
+/tmp/
+# Private planning and review documents, never committed or packed
+PLAN*.md
+__*.md
+/plans/
+docs/maintainers/design/prd*.md
+docs/maintainers/reviews/
+docs/reference/api
+docs/.vitepress/cache
+docs/.vitepress/dist
