@@ -49,13 +49,13 @@ server.use([() => import('#middleware/origin_guard_middleware')])
 
 The guard lets `GET`, `HEAD` and `OPTIONS` through. For every other method:
 
-| Request                                            | Outcome  |
-| -------------------------------------------------- | -------- |
-| `Origin` equals the public origin exactly          | accepted |
-| `Origin` equals an allowed origin exactly          | accepted |
-| No `Origin`, `Sec-Fetch-Site: same-origin`         | accepted |
-| No `Origin`, any other or no `Sec-Fetch-Site`      | refused  |
-| Any other `Origin`, whatever else the request says | refused  |
+| Request                                                     | Outcome  |
+| ----------------------------------------------------------- | -------- |
+| `Origin` equals the public origin exactly                   | accepted |
+| `Origin` equals an allowed origin exactly                   | accepted |
+| No or empty `Origin`, `Sec-Fetch-Site: same-origin`         | accepted |
+| No or empty `Origin`, any other or no `Sec-Fetch-Site`      | refused  |
+| Any other `Origin`, including `null`, whatever else is sent | refused  |
 
 A refusal answers `403` with `{ "error": "Cross-site request rejected." }` and the rest of the
 stack does not run. `Origin` is compared as sent: nothing is normalised, and `Host` and the request
