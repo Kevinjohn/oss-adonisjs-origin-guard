@@ -1,0 +1,10 @@
+# Decision gaps
+
+None was identified between the [README](../README.md), the [changelog](../CHANGELOG.md) and the [source](../src/) during this catalogue pass. No separate product decision record is present. The following boundaries are retained intentionally, not unresolved feature requests.
+
+| Boundary                        | Contract and source                                                                                                                               | Catalogue treatment                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Exact origin match              | [isTrustedUnsafeOrigin](../src/guard.ts#L24) compares `Origin` as sent with no normalisation and never reads `Host` or the protocol.              | US-ORIGIN-01 relies on US-ORIGIN-02/03 to supply origins in serialized form; it does not promise matching of other spellings. |
+| Clients without browser headers | A write with neither `Origin` nor `Sec-Fetch-Site: same-origin` is refused ([guard](../src/guard.ts)).                                            | US-ORIGIN-01 states that scripts and other non-browser clients must send `Origin`.                                            |
+| Shield CSRF                     | The package does not configure or disable Shield ([README](../README.md#refuse-cross-site-writes)).                                               | US-ORIGIN-01 leaves turning off token-based CSRF to the host.                                                                 |
+| Private networks only           | [isPrivatePeer](../src/private_peer.ts) covers loopback, RFC 1918 IPv4 ranges, `::1` and `fc00::/7`; link-local and other ranges are not trusted. | US-ORIGIN-04 leaves deployments with other proxy addresses to a host-written `trustProxy`.                                    |
