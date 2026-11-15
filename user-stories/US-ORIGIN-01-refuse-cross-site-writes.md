@@ -4,7 +4,7 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 **Status:** Current.
 **Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack.
-**Entry:** `createOriginGuard({ publicOrigin, allowedOrigins })`, default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values; it does not check the method or send a response.
+**Entry:** `createOriginGuard({ publicOrigin, allowedOrigins })`, default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
 **Documentation:** [Refuse cross-site writes](../README.md#refuse-cross-site-writes).
 **Source:** [guard](../src/guard.ts).
 **Coverage:** [Guard tests](../tests/guard.spec.ts).
@@ -29,7 +29,7 @@ As an application developer, I want browser writes from untrusted origins refuse
 ```mermaid
 flowchart TD
     A["Browser sends a request to the application"] --> B{"GET, HEAD or OPTIONS?"}
-    B -->|Yes| C["Request continues to the next middleware and the route"]
+    B -->|Yes| C["Request continues through the middleware stack"]
     B -->|No| D{"Origin present and not empty?"}
     D -->|Yes| E{"Origin is the public origin or an allowed origin?"}
     D -->|No| F{"Sec-Fetch-Site is same-origin?"}
