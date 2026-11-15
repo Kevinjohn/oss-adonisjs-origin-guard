@@ -28,6 +28,21 @@ const cases: { name: string; headers: Record<string, string>; trusted: boolean }
     trusted: false,
   },
   {
+    name: 'treats an empty Origin as absent and admits a same-origin fetch',
+    headers: { 'origin': '', 'sec-fetch-site': 'same-origin' },
+    trusted: true,
+  },
+  {
+    name: 'treats an empty Origin as absent and refuses it without Sec-Fetch-Site',
+    headers: { origin: '' },
+    trusted: false,
+  },
+  {
+    name: 'refuses the opaque Origin null despite Sec-Fetch-Site same-origin',
+    headers: { 'origin': 'null', 'sec-fetch-site': 'same-origin' },
+    trusted: false,
+  },
+  {
     name: 'refuses an Origin that only matches after normalising',
     headers: { origin: 'HTTPS://WAYNE.EXAMPLE/' },
     trusted: false,

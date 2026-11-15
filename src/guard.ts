@@ -17,8 +17,9 @@ export interface UnsafeRequestHeaders {
 
 /**
  * Whether an unsafe request comes from a trusted origin. With `Origin`, it must equal the public
- * origin or an allowed origin exactly; nothing is normalised. Without `Origin`, only
- * `Sec-Fetch-Site: same-origin` is accepted. `Host` and the request protocol are never consulted.
+ * origin or an allowed origin exactly; nothing is normalised. Without `Origin`, or with an empty
+ * one, only `Sec-Fetch-Site: same-origin` is accepted. `Host` and the request protocol are never
+ * consulted.
  */
 export function isTrustedUnsafeOrigin(
   { origin, fetchSite }: UnsafeRequestHeaders,
