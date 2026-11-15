@@ -97,6 +97,10 @@ pnpm test
 pnpm build
 ```
 
+`pnpm check:changed [--static] [base]` runs the checks the files changed since `base` (default
+`origin/main`) need: format, lint, types, the changed specs, the full suite when source or
+manifests changed, and the build. `--static` leaves out the full suite and the build.
+
 ## License
 
 MIT
