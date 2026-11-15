@@ -1,6 +1,6 @@
 # US-ORIGIN-04 — Trust a proxy on a private network
 
-As an application operator, I want forwarded headers trusted only when the connecting peer is on loopback or a private network so that a reverse proxy on the same host or network can pass the client's address and protocol, and a public client cannot forge them.
+As an application operator, I want AdonisJS to trust forwarded headers only from loopback or private-network addresses so that it can use the client address and protocol supplied by a reverse proxy on the same host or network.
 
 **Status:** Operator.
 **Access:** Operator who controls `config/app.ts` and the proxy placement.

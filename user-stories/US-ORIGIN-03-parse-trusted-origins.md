@@ -17,7 +17,7 @@ As an application operator, I want a comma-separated list of trusted origins val
 
 - Each entry is returned in the serialized form a browser sends in `Origin` (for example a trailing `/` is dropped and the host is lower-cased).
 - `*` throws `CORS requires explicit origins when credentials are enabled`.
-- An entry that does not parse, is not HTTP(S), or has credentials, a path, a query or a fragment throws `Invalid CORS origin "<entry>": expected a bare HTTP(S) origin`. The host corrects the setting and restarts.
+- An entry that does not parse as an HTTP(S) URL, or that after parsing has credentials, a path other than `/`, a non-empty query or a non-empty fragment, throws `Invalid CORS origin "<entry>": expected a bare HTTP(S) origin`. The host corrects the setting and restarts.
 
 ## User flow
 
@@ -25,9 +25,9 @@ As an application operator, I want a comma-separated list of trusted origins val
 flowchart TD
     A["Operator sets the trusted origin list"] --> B["Application starts and parses it"]
     B --> C{"Any entry is a wildcard or not a bare HTTP(S) origin?"}
-    C -->|Yes| D["Boot stops naming the entry; correct the setting"]
+    C -->|Yes| D["Boot stops with a parsing error; correct the setting"]
     D --> A
-    C -->|No| E["CORS and the write guard trust exactly the listed origins"]
+    C -->|No| E["Application receives the parsed origins for its CORS config or the write guard's allowedOrigins"]
 ```
 
 ## Code flow
