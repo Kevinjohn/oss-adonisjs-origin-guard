@@ -4,7 +4,7 @@ As an application operator, I want the origin my application is served from chec
 
 **Status:** Operator.
 **Access:** Operator who sets the host's public URL setting (for example `APP_URL`); host code passes it in, since the package reads no environment variable.
-**Entry:** `resolvePublicOrigin(value, environment, variable)`, called from host code such as the guard's middleware file.
+**Entry:** `resolvePublicOrigin(value, environment, variable)`, called from an eagerly imported host startup/config module. The HTTP kernel imports that module before registering the guard's lazy middleware; the middleware consumes the resulting configuration.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -19,7 +19,8 @@ As an application operator, I want the origin my application is served from chec
 
 - A valid value returns `{ origin, secure }`, where `secure` is true for HTTPS.
 - HTTPS is required in production. Plain HTTP is accepted in development and test only on `localhost`, `127.0.0.1` or `[::1]`.
-- A value that does not parse, is not HTTP(S), carries credentials or differs from its serialized origin throws `<variable> must be a bare HTTP(S) origin`.
+- The host declares `APP_URL` in the `start/env.ts` schema (for example, `APP_URL: Env.schema.string()`) before reading it through `#start/env`.
+- A value that does not parse, is not HTTP(S), carries credentials or differs from its serialized origin throws `<variable> must be a bare HTTP(S) origin` during HTTP startup. Invalid configuration prevents boot before requests are handled.
 - Plain HTTP throws `<variable>: public production origins require HTTPS` in production. In development and test it throws `<variable> must use HTTPS outside loopback in development/test` unless the hostname is `localhost`, `127.0.0.1` or `[::1]`. The host corrects the setting and restarts.
 
 ## User flow

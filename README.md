@@ -8,7 +8,8 @@ Origin handling for an AdonisJS 7 application behind a browser:
 - decide whether a proxy peer is on loopback or a private network.
 
 Requires Node 24 or later and `@adonisjs/core` 7. The package reads no environment variable; the
-host passes every value in.
+host passes every value in. The host must declare `APP_URL` in `start/env.ts`, for example as
+`APP_URL: Env.schema.string()`, before reading it from `#start/env`.
 
 ## Install
 
@@ -22,28 +23,37 @@ There is no provider and nothing to configure with `node ace configure`.
 
 ## Refuse cross-site writes
 
-Create a middleware file that default-exports the guard:
+Validate the host settings in a module shared by the eagerly loaded kernel and the middleware:
+
+```ts
+// start/origin_config.ts
+import env from '#start/env'
+import { parseOrigins, resolvePublicOrigin } from '@kevinjohn/adonisjs-origin-guard'
+
+export const originGuardConfig = {
+  publicOrigin: resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin,
+  allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
+}
+```
+
+Import that module from `start/kernel.ts` before registering the lazy middleware. AdonisJS loads
+the kernel during HTTP startup; this eager import makes invalid origin settings stop boot, before
+the first request. Keep the middleware import lazy, and have it consume the already evaluated
+configuration:
 
 ```ts
 // app/middleware/origin_guard_middleware.ts
-import {
-  createOriginGuard,
-  parseOrigins,
-  resolvePublicOrigin,
-} from '@kevinjohn/adonisjs-origin-guard'
-import env from '#start/env'
+import { createOriginGuard } from '@kevinjohn/adonisjs-origin-guard'
+import { originGuardConfig } from '#start/origin_config'
 
-const publicOrigin = resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL')
-
-export default createOriginGuard({
-  publicOrigin: publicOrigin.origin,
-  allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
-})
+export default createOriginGuard(originGuardConfig)
 ```
 
 Register it as server middleware in `start/kernel.ts`, before anything that acts on a write:
 
 ```ts
+import '#start/origin_config'
+
 server.use([() => import('#middleware/origin_guard_middleware')])
 ```
 
