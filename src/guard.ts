@@ -3,9 +3,15 @@ import type { NextFn } from '@adonisjs/core/types/http'
 
 /** The origins an unsafe request may come from, in the serialized form browsers send. */
 export interface OriginGuardConfig {
-  /** The origin the application is served from. */
+  /**
+   * The validated origin the application is served from, in the serialized form browsers send.
+   * Host code should obtain it from `resolvePublicOrigin` during startup.
+   */
   publicOrigin: string
-  /** Further origins trusted for writes, for example the CORS origin list. */
+  /**
+   * Further validated serialized origins trusted for writes, for example the result of
+   * `parseOrigins` for the CORS origin list.
+   */
   allowedOrigins?: readonly string[]
 }
 
@@ -32,7 +38,9 @@ export function isTrustedUnsafeOrigin(
 /**
  * Builds a server middleware that refuses every request other than GET, HEAD and OPTIONS unless
  * `isTrustedUnsafeOrigin` accepts it. A refusal answers 403 `{ error: 'Cross-site request rejected.' }`
- * and the rest of the stack does not run. Default-export the returned class from a middleware file.
+ * and the rest of the stack does not run. Supply origins validated by `resolvePublicOrigin` and
+ * `parseOrigins` before startup; the middleware compares request headers against that config without
+ * validating the config on each request. Default-export the returned class from a middleware file.
  */
 export function createOriginGuard(config: OriginGuardConfig) {
   return class OriginGuardMiddleware {

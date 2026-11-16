@@ -11,17 +11,18 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 ## Acceptance criteria
 
-| Input            | Control                            | Required/default/conditions                                                                                                                                    |
-| ---------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `publicOrigin`   | `OriginGuardConfig.publicOrigin`   | Required. The origin the application is served from, in the serialized form browsers send; [US-ORIGIN-02](US-ORIGIN-02-validate-public-origin.md) produces it. |
-| `allowedOrigins` | `OriginGuardConfig.allowedOrigins` | Optional; defaults to none. Further exact origins trusted for writes, for example the [parsed CORS list](US-ORIGIN-03-parse-trusted-origins.md).               |
-| `Origin`         | Request header                     | Compared as sent; nothing is normalised. An empty value counts as absent.                                                                                      |
-| `Sec-Fetch-Site` | Request header                     | Decides the result only when `Origin` is absent or empty; only `same-origin` is accepted.                                                                      |
+| Input            | Control                            | Required/default/conditions                                                                                                                                                                   |
+| ---------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `publicOrigin`   | `OriginGuardConfig.publicOrigin`   | Required. A validated origin the application is served from, in the serialized form browsers send; [US-ORIGIN-02](US-ORIGIN-02-validate-public-origin.md) produces it during host startup.    |
+| `allowedOrigins` | `OriginGuardConfig.allowedOrigins` | Optional; defaults to none. Further validated serialized origins trusted for writes, for example the [parsed CORS list](US-ORIGIN-03-parse-trusted-origins.md), produced during host startup. |
+| `Origin`         | Request header                     | Compared as sent; nothing is normalised. An empty value counts as absent.                                                                                                                     |
+| `Sec-Fetch-Site` | Request header                     | Decides the result only when `Origin` is absent or empty; only `same-origin` is accepted.                                                                                                     |
 
 - `GET`, `HEAD` and `OPTIONS` pass through without reading either header.
 - Any other method is accepted when `Origin` equals the public origin or an allowed origin exactly, or when `Origin` is absent or empty and `Sec-Fetch-Site` is `same-origin`.
 - Every other write, including `Origin: null`, a `same-site` or `cross-site` fetch without `Origin`, and a request with neither header, is refused with `403` and `{ "error": "Cross-site request rejected." }`; the rest of the stack does not run.
 - `Host` and the request protocol are never consulted. A non-browser client that sends neither header must send `Origin`.
+- The host supplies validated configuration at startup. The middleware compares request headers with that configuration and does not revalidate configured origins per request.
 - The host turns off Shield's token-based CSRF if this guard replaces it; the package does not.
 
 ## User flow

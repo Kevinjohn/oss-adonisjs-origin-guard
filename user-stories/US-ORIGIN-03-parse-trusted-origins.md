@@ -4,7 +4,7 @@ As an application operator, I want a comma-separated list of trusted origins val
 
 **Status:** Operator.
 **Access:** Operator who sets the host's trusted-origin setting (for example `CORS_ORIGINS`); host code passes it in.
-**Entry:** `parseOrigins(list)`, called from host code such as the guard's middleware file or CORS config.
+**Entry:** `parseOrigins(list)`, called from an eagerly imported host startup/config module or CORS config. The HTTP kernel imports the shared configuration before registering lazy middleware, so invalid settings prevent HTTP startup; the middleware consumes the parsed list.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -17,7 +17,8 @@ As an application operator, I want a comma-separated list of trusted origins val
 
 - Each entry is returned in the serialized form a browser sends in `Origin` (for example a trailing `/` is dropped and the host is lower-cased).
 - `*` throws `CORS requires explicit origins when credentials are enabled`.
-- An entry that does not parse as an HTTP(S) URL, or that after parsing has credentials, a path other than `/`, a non-empty query or a non-empty fragment, throws `Invalid CORS origin "<entry>": expected a bare HTTP(S) origin`. The host corrects the setting and restarts.
+- An entry that does not parse as an HTTP(S) URL, or that after WHATWG parsing has credentials, a path other than `/`, a non-empty query or a non-empty fragment, throws `Invalid CORS origin at position <n>: expected a bare HTTP(S) origin`. The rejected value is omitted from diagnostics. The host corrects the setting and restarts.
+- Accepted spellings are returned as `URL.origin`, so host case, default ports and a trailing root slash are normalized by WHATWG URL parsing before validation and return.
 
 ## User flow
 

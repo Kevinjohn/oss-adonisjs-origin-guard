@@ -4,10 +4,10 @@ import { parseOrigins, resolvePublicOrigin } from '../index.js'
 test.group('parseOrigins', () => {
   test('returns each entry in serialized form and skips blanks', ({ assert }) => {
     assert.deepEqual(parseOrigins(''), [])
-    assert.deepEqual(parseOrigins(' https://wayne.example , ,HTTP://LOCALHOST:5173/ '), [
-      'https://wayne.example',
-      'http://localhost:5173',
-    ])
+    assert.deepEqual(
+      parseOrigins(' https://wayne.example , ,HTTPS://WAYNE.EXAMPLE:443/,HTTP://LOCALHOST:5173/ '),
+      ['https://wayne.example', 'https://wayne.example', 'http://localhost:5173']
+    )
   })
 
   test('refuses a wildcard', ({ assert }) => {
@@ -29,9 +29,26 @@ test.group('parseOrigins', () => {
     ]) {
       assert.throws(
         () => parseOrigins(invalid),
-        `Invalid CORS origin ${JSON.stringify(invalid)}: expected a bare HTTP(S) origin`
+        'Invalid CORS origin at position 1: expected a bare HTTP(S) origin'
       )
     }
+  })
+
+  test('reports the entry position without echoing invalid values', ({ assert }) => {
+    const rejected = 'https://user:dummy-secret@wayne.example?token=dummy-query'
+    let thrown: unknown
+    try {
+      parseOrigins(`https://wayne.example, ${rejected}`)
+    } catch (error) {
+      thrown = error
+    }
+
+    assert.isTrue(thrown instanceof Error)
+    const message = thrown instanceof Error ? thrown.message : ''
+    assert.include(message, 'Invalid CORS origin at position 2:')
+    assert.notInclude(message, rejected)
+    assert.notInclude(message, 'dummy-secret')
+    assert.notInclude(message, 'dummy-query')
   })
 })
 
