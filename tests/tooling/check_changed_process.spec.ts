@@ -28,6 +28,7 @@ type Fixture = {
   bin: string
   log: string
   ready: string
+  commandPid: string
   termSent: string
   base: string
   env: NodeJS.ProcessEnv
@@ -53,7 +54,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
 
     const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
     await symlink(git, path.join(supportBin, 'git'))
-    const gitEnv = {
+    const gitEnv: NodeJS.ProcessEnv = {
       ...process.env,
       ...options.inheritedEnv,
       GIT_CONFIG_NOSYSTEM: '1',
@@ -61,6 +62,16 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
       GIT_CONFIG_COUNT: '0',
       GIT_CONFIG_PARAMETERS: '',
       GIT_CONFIG: path.join(directory, 'empty-gitconfig'),
+    }
+    for (const key of [
+      'GIT_DIR',
+      'GIT_WORK_TREE',
+      'GIT_INDEX_FILE',
+      'GIT_COMMON_DIR',
+      'GIT_OBJECT_DIRECTORY',
+      'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    ]) {
+      delete gitEnv[key]
     }
     const runGit = (args: string[]) =>
       execFileSync(git, args, { cwd: root, env: gitEnv, stdio: 'ignore' })
@@ -82,6 +93,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
     runGit(['commit', '-qm', 'select static checks'])
     const log = path.join(directory, 'commands.log')
     const ready = path.join(directory, 'descendant.pid')
+    const commandPid = path.join(directory, 'command.pid')
     const termSent = path.join(directory, 'term-sent')
     await writeFile(log, '')
 
@@ -93,7 +105,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
       const commandPath = path.join(bin, 'pnpm')
       await writeFile(
         commandPath,
-        `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { readFile, writeFile } from 'node:fs/promises'\nconst args = process.argv.slice(2)\nawait writeFile(${JSON.stringify(log)}, (await readFile(${JSON.stringify(log)}, 'utf8')) + args.join(' ') + '\\n')\nif (process.env.CHECK_CHANGED_HANG === '1') {\n  spawn(process.execPath, ['worker.js'], { cwd: process.cwd(), stdio: 'ignore' })\n  for (let attempt = 0; attempt < 250; attempt++) {\n    if (await readFile(${JSON.stringify(ready)}, 'utf8').catch(() => '')) break\n    await new Promise((resolve) => setTimeout(resolve, 20))\n  }\n  setInterval(() => {}, 1000)\n}\n`,
+        `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { readFile, writeFile } from 'node:fs/promises'\nconst args = process.argv.slice(2)\nawait writeFile(${JSON.stringify(commandPid)}, String(process.pid))\nawait writeFile(${JSON.stringify(log)}, (await readFile(${JSON.stringify(log)}, 'utf8')) + args.join(' ') + '\\n')\nif (process.env.CHECK_CHANGED_HANG === '1') {\n  spawn(process.execPath, ['worker.js'], { cwd: process.cwd(), stdio: 'ignore' })\n  for (let attempt = 0; attempt < 250; attempt++) {\n    if (await readFile(${JSON.stringify(ready)}, 'utf8').catch(() => '')) break\n    await new Promise((resolve) => setTimeout(resolve, 20))\n  }\n  setInterval(() => {}, 1000)\n}\n`,
         { mode: 0o755 }
       )
     }
@@ -119,7 +131,7 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
       env.NODE_OPTIONS =
         `${env.NODE_OPTIONS ?? ''} --require=${path.join(directory, 'process-hook.cjs')}`.trim()
     }
-    return { directory, root, bin, log, ready, termSent, base, env }
+    return { directory, root, bin, log, ready, commandPid, termSent, base, env }
   } catch (error) {
     await rm(directory, { recursive: true, force: true })
     throw error
@@ -152,17 +164,81 @@ test('command log assertions reject later lint and typecheck invocations', () =>
   }
 })
 
-async function cleanupFixture(f: Fixture): Promise<void> {
-  const child = f.child
-  if (child && child.exitCode === null && child.signalCode === null) {
-    child.kill('SIGTERM')
-    await Promise.race([
-      new Promise<void>((resolve) => child.once('close', () => resolve())),
-      new Promise<void>((resolve) => setTimeout(resolve, 500)),
-    ])
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+async function readOwnedPid(filePath: string): Promise<number | undefined> {
+  let content: string
+  try {
+    content = await readFile(filePath, 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    throw error
   }
-  await rm(f.directory, { recursive: true, force: true })
+  const value = content.trim()
+  const pid = Number(value)
+  if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(pid)) {
+    throw new Error(`Invalid owned PID in ${filePath}`)
+  }
+  return pid
+}
+
+async function stillAlive(pids: number[], timeoutMs: number): Promise<number[]> {
+  const deadline = Date.now() + timeoutMs
+  while (true) {
+    const alive: number[] = []
+    for (const pid of pids) if (await isAlive(pid)) alive.push(pid)
+    if (alive.length === 0 || Date.now() >= deadline) return alive
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+async function cleanupFixture(f: Fixture): Promise<void> {
+  const failures: unknown[] = []
+  const readPid = async (filePath: string): Promise<number | undefined> => {
+    try {
+      return await readOwnedPid(filePath)
+    } catch (error) {
+      failures.push(error)
+      return undefined
+    }
+  }
+  const commandPid = await readPid(f.commandPid)
+  const workerPid = await readPid(f.ready)
+  const runnerPid = f.child?.pid
+  const pids = [runnerPid, commandPid, workerPid].filter((pid): pid is number => pid !== undefined)
+  const signal = (pid: number, name: NodeJS.Signals): void => {
+    try {
+      process.kill(pid, name)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') failures.push(error)
+    }
+  }
+
+  let alive = await stillAlive(pids, 0)
+  if (runnerPid && alive.includes(runnerPid)) signal(runnerPid, 'SIGTERM')
+  if (
+    commandPid &&
+    process.platform !== 'win32' &&
+    (alive.includes(commandPid) || (workerPid && alive.includes(workerPid)))
+  )
+    signal(-commandPid, 'SIGTERM')
+  if (workerPid && alive.includes(workerPid)) signal(workerPid, 'SIGTERM')
+  alive = await stillAlive(pids, 500)
+  if (alive.length > 0) {
+    if (commandPid && process.platform !== 'win32') signal(-commandPid, 'SIGKILL')
+    if (workerPid) signal(workerPid, 'SIGKILL')
+    if (runnerPid) signal(runnerPid, 'SIGKILL')
+    alive = await stillAlive(pids, 1000)
+    if (alive.length > 0)
+      failures.push(new Error(`Owned processes did not exit: ${alive.join(', ')}`))
+  }
+  f.child?.stdout?.destroy()
+  f.child?.stderr?.destroy()
+  f.child?.unref()
+  try {
+    await rm(f.directory, { recursive: true, force: true })
+  } catch (error) {
+    failures.push(error)
+  }
+  if (failures.length) throw new AggregateError(failures, 'Fixture cleanup failed')
 }
 
 test('runs selected static checks normally and observes a missing command spawn error', async ({
@@ -341,3 +417,64 @@ test('fixture ignores hostile inherited Git configuration and Node preloads', as
     'typecheck',
   ])
 })
+
+test('fixture Git commands cannot target an inherited repository or index', async ({ cleanup }) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-host-repository-'))
+  cleanup(() => rm(directory, { recursive: true, force: true }))
+  const host = path.join(directory, 'host')
+  await mkdir(host)
+  const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+  const hostEnv = {
+    PATH: process.env.PATH,
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: path.join(directory, 'empty-gitconfig'),
+  }
+  const hostGit = (args: string[]) =>
+    execFileSync(git, args, { cwd: host, env: hostEnv, encoding: 'utf8' }).trim()
+  hostGit(['init', '-q'])
+  hostGit(['config', 'user.email', 'host@example.test'])
+  hostGit(['config', 'user.name', 'Host'])
+  hostGit(['config', 'commit.gpgsign', 'false'])
+  hostGit(['config', 'core.hooksPath', path.join(directory, 'empty-hooks')])
+  await writeFile(path.join(host, 'README.md'), 'host baseline\n')
+  hostGit(['add', '.'])
+  hostGit(['commit', '-qm', 'host baseline'])
+  const headBefore = hostGit(['rev-parse', 'HEAD'])
+  const indexBefore = await readFile(path.join(host, '.git/index'))
+
+  const f = await fixture({
+    inheritedEnv: {
+      GIT_DIR: path.join(host, '.git'),
+      GIT_WORK_TREE: host,
+      GIT_INDEX_FILE: path.join(host, '.git/index'),
+    },
+  })
+  cleanup(() => cleanupFixture(f))
+  const result = await outputOf(launch(f))
+  assert.equal(result.code, 0, result.text)
+  assert.equal(hostGit(['rev-parse', 'HEAD']), headBefore)
+  assert.deepEqual(await readFile(path.join(host, '.git/index')), indexBefore)
+  assert.equal(hostGit(['status', '--porcelain']), '')
+})
+
+test('fixture cleanup reaps a TERM-resistant descendant after readiness fails', async ({
+  cleanup,
+}) => {
+  const f = await fixture({ command: 'hang' })
+  cleanup(() => cleanupFixture(f))
+  const result = outputOf(launch(f))
+  const workerPid = await waitForPid(f.ready)
+  const commandPid = await waitForPid(f.commandPid)
+  await assert.rejects(async () => {
+    try {
+      throw new Error('readiness assertion failed')
+    } finally {
+      await cleanupFixture(f)
+    }
+  }, /readiness assertion failed/)
+  assert.equal(await isAlive(workerPid), false)
+  assert.equal(await isAlive(commandPid), false)
+  assert.equal(await isAlive(f.child!.pid!), false)
+  await assert.rejects(readFile(f.directory, 'utf8'), { code: 'ENOENT' })
+  await result
+}).timeout(10_000)
