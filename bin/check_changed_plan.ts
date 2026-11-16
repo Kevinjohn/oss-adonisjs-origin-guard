@@ -25,9 +25,11 @@ const dependencyFiles = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'
 // Formatter configuration (and package.json, which pins Prettier) can change any file's format.
 const formatterInputs = [
   /^\.prettierrc/,
+  /^prettier\.config\./,
   /^\.prettierignore$/,
   /^\.editorconfig$/,
   /^package\.json$/,
+  /^pnpm-lock\.yaml$/,
 ]
 
 const isSpec = (path: string) => /^tests\/.+\.spec\.ts$/.test(path)
