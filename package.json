@@ -103,7 +103,7 @@
     "fixedExtension": false,
     "dts": false,
     "treeshake": false,
-    "sourcemaps": false,
+    "sourcemap": false,
     "target": "esnext"
   },
   "prettier": "@adonisjs/prettier-config",
