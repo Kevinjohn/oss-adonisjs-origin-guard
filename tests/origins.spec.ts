@@ -4,10 +4,10 @@ import { parseOrigins, resolvePublicOrigin } from '../index.js'
 test.group('parseOrigins', () => {
   test('returns each entry in serialized form and skips blanks', ({ assert }) => {
     assert.deepEqual(parseOrigins(''), [])
-    assert.deepEqual(parseOrigins(' https://wayne.example , ,HTTP://LOCALHOST:5173/ '), [
-      'https://wayne.example',
-      'http://localhost:5173',
-    ])
+    assert.deepEqual(
+      parseOrigins(' https://wayne.example , ,HTTPS://WAYNE.EXAMPLE:443/,HTTP://LOCALHOST:5173/ '),
+      ['https://wayne.example', 'https://wayne.example', 'http://localhost:5173']
+    )
   })
 
   test('refuses a wildcard', ({ assert }) => {
