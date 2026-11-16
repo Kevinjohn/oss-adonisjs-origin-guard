@@ -74,7 +74,7 @@ function.
 
 Pass a `publicOrigin` produced by `resolvePublicOrigin` and `allowedOrigins` produced by
 `parseOrigins` (or an equivalent validated serialized HTTP(S) origin list). Validate host-owned
-settings once during eager startup as shown below. The per-request guard compares headers with that
+settings once during eager startup as shown in the startup example above. The per-request guard compares headers with that
 configuration; it does not parse or revalidate the configured origins on each request.
 
 Turn off Shield's token-based CSRF if this guard replaces it. A client that sends neither header,
@@ -84,8 +84,8 @@ such as a script using a bare HTTP library, must send `Origin`.
 
 - `parseOrigins(list)` takes a comma-separated string and returns each origin in the form a browser
   sends. It throws on `*` and on any entry whose WHATWG-parsed URL has credentials, a path other
-  than `/`, a non-empty query or a non-empty fragment. Errors report the one-based entry position
-  without echoing the rejected value. Parsing normalizes equivalent URL spellings, such as host
+  than `/`, a non-empty query or a non-empty fragment. Malformed entries report the one-based
+  position without echoing the rejected value. Parsing normalizes equivalent URL spellings, such as host
   case, default ports and a root slash, before returning `URL.origin`.
 - `resolvePublicOrigin(value, environment, variable)` validates the one origin the application is
   served from and returns `{ origin, secure }`. HTTPS is required in production, and outside
