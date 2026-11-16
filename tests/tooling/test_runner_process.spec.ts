@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { collectExit, outputOf } from './child_process.js'
+import { outputOf } from './child_process.js'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -24,8 +24,8 @@ async function runSelection(
     ['--import=@poppinss/ts-exec', '--enable-source-maps', runnerPath, `--files=${relativeFile}`],
     { cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'] }
   )
-  const output = await outputOf(child)
-  return collectExit(child, output)
+  const result = outputOf(child)
+  return result
 }
 
 test('the real runner rejects skipped-only, todo-only, and empty selections', async ({
