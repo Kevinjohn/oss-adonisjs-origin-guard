@@ -15,7 +15,7 @@ let active: ChildProcess | undefined
 let interruptedBy: NodeJS.Signals | undefined
 let interruptionCleanup: Promise<void> | undefined
 const signalErrors: unknown[] = []
-let abandonActive: ((error: unknown) => void) | undefined
+let abandonActive: ((error?: unknown) => void) | undefined
 
 function describeError(error: unknown): string {
   if (error instanceof AggregateError) {
@@ -109,8 +109,12 @@ function interrupt(signal: NodeJS.Signals): void {
   if (!interruptedBy) {
     interruptedBy = signal
     const child = active
+    const abandon = abandonActive
     interruptionCleanup = child ? terminateOwnedProcess(child) : Promise.resolve()
-    void interruptionCleanup.catch((error) => abandonActive?.(error))
+    void interruptionCleanup.then(
+      () => abandon?.(),
+      (error) => abandon?.(error)
+    )
     return
   }
 
@@ -170,12 +174,25 @@ function run(
     child.stderr.on('data', (chunk) => (output += chunk))
     const timer = setTimeout(() => {
       timedOut = true
+      const abandon = abandonActive
       output += `\n[check:changed] stopped after ${stepLimitMs / 60000} minutes\n`
+      let signalError: unknown
       try {
         signalOwnedProcess(child, 'SIGKILL')
       } catch (error) {
+        signalError = error
         output += `[check:changed] timeout cleanup failed: ${describeError(error)}\n`
       }
+      void waitForOwnedProcessExit(child, reapGraceMs).then(
+        (stopped) =>
+          abandon?.(
+            signalError ??
+              (stopped
+                ? undefined
+                : new Error('The owned process group did not exit after SIGKILL.'))
+          ),
+        (error) => abandon?.(signalError ?? error)
+      )
     }, stepLimitMs)
     child.once('error', (error) => {
       spawnError = error

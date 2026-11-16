@@ -341,3 +341,78 @@ test('fixture ignores hostile inherited Git configuration and Node preloads', as
     'typecheck',
   ])
 })
+
+for (const signalFails of [false, true]) {
+  test(`timeout settles a nonclosing child when signal delivery ${signalFails ? 'fails' : 'succeeds'}`, async ({
+    cleanup,
+  }) => {
+    const f = await fixture()
+    cleanup(() => cleanupFixture(f))
+    const hook = path.join(f.directory, 'timeout-hook.cjs')
+    await writeFile(
+      hook,
+      `
+const cp = require('node:child_process')
+const { EventEmitter } = require('node:events')
+const { PassThrough } = require('node:stream')
+const originalTimeout = global.setTimeout
+global.setTimeout = (callback, ms, ...args) => ms === 900000 ? originalTimeout(callback, 0, ...args) : originalTimeout(callback, ms, ...args)
+cp.spawn = () => {
+ const child = new EventEmitter(); child.pid = 99999999; child.exitCode = child.signalCode = null
+ child.stdout = new PassThrough(); child.stderr = new PassThrough()
+ const liveHandle = setInterval(() => {}, 1000)
+ child.unref = () => { clearInterval(liveHandle); console.log('LOCAL_HANDLE_RELEASED') }
+ process.nextTick(() => child.stdout.write('partial output'))
+ return child
+}
+
+process.kill = (_pid, signal) => {
+ if (signal === 'SIGKILL' && ${signalFails}) { const error = new Error('signal denied'); error.code = 'EPERM'; throw error }
+ if (signal === 0) { const error = new Error('gone'); error.code = 'ESRCH'; throw error }
+ return true
+}
+require('node:module').syncBuiltinESMExports()
+`
+    )
+    f.env.NODE_OPTIONS = `--require=${hook}`
+    const result = await outputOf(launch(f))
+    assert.equal(result.code, 1, result.text)
+    assert.match(result.text, /stopped after 15 minutes/)
+    assert.match(result.text, /partial output/)
+    assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
+    assert.equal(await readFile(f.log, 'utf8'), '')
+    if (signalFails) assert.match(result.text, /timeout cleanup failed: signal denied/)
+  }).timeout(10_000)
+}
+
+test('interrupt settles a nonclosing child after successful cleanup', async ({ cleanup }) => {
+  const f = await fixture()
+  cleanup(() => cleanupFixture(f))
+  const hook = path.join(f.directory, 'interrupt-hook.cjs')
+  await writeFile(
+    hook,
+    `
+const cp = require('node:child_process')
+const { EventEmitter } = require('node:events')
+const { PassThrough } = require('node:stream')
+cp.spawn = () => {
+ const child = new EventEmitter(); child.pid = 99999999; child.exitCode = child.signalCode = null
+ child.stdout = new PassThrough(); child.stderr = new PassThrough()
+ const liveHandle = setInterval(() => {}, 1000)
+ child.unref = () => { clearInterval(liveHandle); console.log('LOCAL_HANDLE_RELEASED') }
+ setImmediate(() => process.emit('SIGTERM'))
+ return child
+}
+process.kill = (_pid, signal) => {
+ if (signal === 0) { const error = new Error('gone'); error.code = 'ESRCH'; throw error }
+ return true
+}
+require('node:module').syncBuiltinESMExports()
+`
+  )
+  f.env.NODE_OPTIONS = `--require=${hook}`
+  const result = await outputOf(launch(f))
+  assert.equal(result.code, 143, result.text)
+  assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
+  assert.equal(await readFile(f.log, 'utf8'), '')
+}).timeout(10_000)
