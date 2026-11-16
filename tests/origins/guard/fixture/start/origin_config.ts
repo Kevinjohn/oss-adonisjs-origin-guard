@@ -1,5 +1,7 @@
-import { resolvePublicOrigin } from '../../../../../index.js'
+import { parseOrigins, resolvePublicOrigin } from '../../../../../index.js'
+import env from './env.js'
 
-export function loadOriginConfig(value: string) {
-  return resolvePublicOrigin(value, 'test', 'APP_URL')
+export const originGuardConfig = {
+  publicOrigin: resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin,
+  allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
 }

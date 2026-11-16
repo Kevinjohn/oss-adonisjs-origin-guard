@@ -4,7 +4,7 @@ As an application operator, I want a comma-separated list of trusted origins val
 
 **Status:** Operator.
 **Access:** Operator who sets the host's trusted-origin setting (for example `CORS_ORIGINS`); host code passes it in.
-**Entry:** `parseOrigins(list)`, called from an eagerly imported host startup/config module or CORS config. The HTTP kernel imports the shared configuration before registering lazy middleware, so invalid settings prevent boot; the middleware consumes the parsed list.
+**Entry:** `parseOrigins(list)`, called from an eagerly imported host startup/config module or CORS config. The HTTP kernel imports the shared configuration before registering lazy middleware, so invalid settings prevent HTTP startup; the middleware consumes the parsed list.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).

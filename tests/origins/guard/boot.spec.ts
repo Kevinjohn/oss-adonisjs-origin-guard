@@ -1,81 +1,59 @@
 import { test } from '@japa/runner'
-import { Ignitor } from '@adonisjs/core/ignitor'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
-const appRoot = new URL('../../../', import.meta.url)
-const kernel = new URL('./fixture/start/kernel.ts', import.meta.url)
+const fixtureRoot = new URL('./fixture/', import.meta.url)
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url))
+const bootstrap = `
+  import { Ignitor } from '@adonisjs/core/ignitor'
+
+  const appRoot = new URL(${JSON.stringify(fixtureRoot.href)})
+  const kernel = new URL('./start/kernel.ts', appRoot)
+  const app = new Ignitor(appRoot).tap((application) => {
+    application.rcContents({
+      preloads: [{ file: () => import(kernel.href), environment: ['web'] }],
+    })
+  }).createApp('web')
+
+  await app.init()
+  await app.boot()
+  await app.start(() => console.log('HTTP_START_REACHED'))
+  await app.terminate()
+`
+
+function startFixture(appUrl: string, corsOrigins: string) {
+  return spawnSync(
+    process.execPath,
+    ['--import=@poppinss/ts-exec', '--input-type=module', '-e', bootstrap],
+    {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env: { ...process.env, APP_URL: appUrl, CORS_ORIGINS: corsOrigins, NODE_ENV: 'test' },
+    }
+  )
+}
 
 test.group('eager origin validation during Adonis startup', () => {
-  test('stops the application before HTTP startup when APP_URL is invalid', async ({ assert }) => {
-    const previousAppUrl = process.env.APP_URL
-    process.env.APP_URL = 'http://app.example'
+  test('stops startup when APP_URL is invalid', ({ assert }) => {
+    const result = startFixture('http://app.example', '')
 
-    try {
-      const app = new Ignitor(appRoot)
-        .tap((application) => {
-          application.rcContents({
-            preloads: [
-              {
-                file: () => import(`${kernel.href}?invalid-${Date.now()}`),
-                environment: ['web'],
-              },
-            ],
-          })
-        })
-        .createApp('web')
-
-      await app.init()
-      await app.boot()
-
-      let httpStartupReached = false
-      await assert.rejects(
-        () =>
-          app.start(() => {
-            httpStartupReached = true
-          }),
-        /APP_URL must use HTTPS outside loopback in development\/test/
-      )
-
-      assert.isFalse(httpStartupReached)
-      assert.isFalse(app.isReady)
-      await app.terminate()
-    } finally {
-      if (previousAppUrl === undefined) delete process.env.APP_URL
-      else process.env.APP_URL = previousAppUrl
-    }
+    assert.notEqual(result.status, 0)
+    assert.notInclude(result.stdout, 'HTTP_START_REACHED')
+    assert.include(result.stderr, 'APP_URL must use HTTPS outside loopback in development/test')
   })
 
-  test('starts the application when APP_URL is valid', async ({ assert }) => {
-    const previousAppUrl = process.env.APP_URL
-    process.env.APP_URL = 'https://app.example'
+  test('stops startup for invalid CORS_ORIGINS when APP_URL is valid', ({ assert }) => {
+    const result = startFixture('https://app.example', 'https://user:dummy-secret@trusted.example')
 
-    try {
-      const app = new Ignitor(appRoot)
-        .tap((application) => {
-          application.rcContents({
-            preloads: [
-              {
-                file: () => import(`${kernel.href}?valid-${Date.now()}`),
-                environment: ['web'],
-              },
-            ],
-          })
-        })
-        .createApp('web')
+    assert.notEqual(result.status, 0)
+    assert.notInclude(result.stdout, 'HTTP_START_REACHED')
+    assert.include(result.stderr, 'Invalid CORS origin')
+  })
 
-      await app.init()
-      await app.boot()
+  test('starts when both APP_URL and CORS_ORIGINS are valid', ({ assert }) => {
+    const result = startFixture('https://app.example', 'https://trusted.example')
 
-      let httpStartupReached = false
-      await app.start(() => {
-        httpStartupReached = true
-      })
-
-      assert.isTrue(httpStartupReached)
-      assert.isTrue(app.isReady)
-      await app.terminate()
-    } finally {
-      if (previousAppUrl === undefined) delete process.env.APP_URL
-      else process.env.APP_URL = previousAppUrl
-    }
+    assert.equal(result.status, 0, result.stderr)
+    assert.include(result.stdout, 'HTTP_START_REACHED')
   })
 })
