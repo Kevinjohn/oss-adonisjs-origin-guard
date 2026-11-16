@@ -1,3 +1,4 @@
-import { loadOriginConfig } from './origin_config.js'
+import { originGuardConfig } from './origin_config.js'
 
-loadOriginConfig(process.env.APP_URL ?? '')
+export const configuredOrigins = originGuardConfig
+export const loadOriginGuard = () => import('./middleware.js')
