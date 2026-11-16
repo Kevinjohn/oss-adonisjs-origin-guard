@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { spawn, type ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { collectExit, isAlive, outputOf, waitForFile } from './child_process.js'
+import { isAlive, outputOf, waitForFile, waitForPid } from './child_process.js'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -15,6 +17,9 @@ const plannerPath = path.join(repoRoot, 'bin/check_changed_plan.ts')
 type FixtureOptions = {
   command?: 'normal' | 'hang' | 'missing'
   hook?: 'record-term' | 'fail-reap'
+  inheritedEnv?: NodeJS.ProcessEnv
+  onDirectory?: (directory: string) => void
+  failSetup?: boolean
 }
 
 type Fixture = {
@@ -26,100 +31,157 @@ type Fixture = {
   termSent: string
   base: string
   env: NodeJS.ProcessEnv
+  child?: ChildProcess
 }
 
 async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-check-changed-'))
-  const root = path.join(directory, 'checkout')
-  const bin = path.join(directory, 'bin')
-  const supportBin = path.join(directory, 'support-bin')
-  await mkdir(path.join(root, 'bin'), { recursive: true })
-  await mkdir(bin)
-  await mkdir(supportBin)
-  await writeFile(path.join(root, 'bin/check_changed.ts'), await readFile(runnerPath))
-  await writeFile(path.join(root, 'bin/check_changed_plan.ts'), await readFile(plannerPath))
-  await writeFile(path.join(root, 'package.json'), '{"type":"module"}\n')
-  await writeFile(path.join(root, 'README.md'), 'fixture baseline\n')
-  await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'), 'dir')
+  try {
+    options.onDirectory?.(directory)
+    if (options.failSetup) throw new Error('fixture setup failed')
+    const root = path.join(directory, 'checkout')
+    const bin = path.join(directory, 'bin')
+    const supportBin = path.join(directory, 'support-bin')
+    await mkdir(path.join(root, 'bin'), { recursive: true })
+    await mkdir(bin)
+    await mkdir(supportBin)
+    await writeFile(path.join(root, 'bin/check_changed.ts'), await readFile(runnerPath))
+    await writeFile(path.join(root, 'bin/check_changed_plan.ts'), await readFile(plannerPath))
+    await writeFile(path.join(root, 'package.json'), '{"type":"module"}\n')
+    await writeFile(path.join(root, 'README.md'), 'fixture baseline\n')
+    await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'), 'dir')
 
-  const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
-  await symlink(git, path.join(supportBin, 'git'))
-  const runGit = (args: string[]) => execFileSync(git, args, { cwd: root, stdio: 'ignore' })
-  runGit(['init', '-q'])
-  runGit(['config', 'user.email', 'fixture@example.test'])
-  runGit(['config', 'user.name', 'Fixture'])
-  runGit(['add', '.'])
-  runGit(['commit', '-qm', 'fixture baseline'])
-  const base = execFileSync(git, ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-  await writeFile(path.join(root, 'src-trigger.ts'), 'export const changed = true\n')
-  runGit(['add', 'src-trigger.ts'])
-  runGit(['commit', '-qm', 'select static checks'])
-  const log = path.join(directory, 'commands.log')
-  const ready = path.join(directory, 'descendant.pid')
-  const termSent = path.join(directory, 'term-sent')
-  await writeFile(log, '')
+    const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
+    await symlink(git, path.join(supportBin, 'git'))
+    const gitEnv = {
+      ...process.env,
+      ...options.inheritedEnv,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: path.join(directory, 'empty-gitconfig'),
+      GIT_CONFIG_COUNT: '0',
+      GIT_CONFIG_PARAMETERS: '',
+      GIT_CONFIG: path.join(directory, 'empty-gitconfig'),
+    }
+    const runGit = (args: string[]) =>
+      execFileSync(git, args, { cwd: root, env: gitEnv, stdio: 'ignore' })
+    runGit(['init', '-q'])
+    runGit(['config', 'user.email', 'fixture@example.test'])
+    runGit(['config', 'user.name', 'Fixture'])
+    runGit(['config', 'commit.gpgsign', 'false'])
+    runGit(['config', 'core.hooksPath', path.join(directory, 'empty-hooks')])
+    await mkdir(path.join(directory, 'empty-hooks'))
+    runGit(['add', '.'])
+    runGit(['commit', '-qm', 'fixture baseline'])
+    const base = execFileSync(git, ['rev-parse', 'HEAD'], {
+      cwd: root,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim()
+    await writeFile(path.join(root, 'src-trigger.ts'), 'export const changed = true\n')
+    runGit(['add', 'src-trigger.ts'])
+    runGit(['commit', '-qm', 'select static checks'])
+    const log = path.join(directory, 'commands.log')
+    const ready = path.join(directory, 'descendant.pid')
+    const termSent = path.join(directory, 'term-sent')
+    await writeFile(log, '')
 
-  await writeFile(
-    path.join(root, 'worker.js'),
-    `import { writeFile } from 'node:fs/promises'\nprocess.on('SIGTERM', () => {})\nawait writeFile(${JSON.stringify(ready)}, String(process.pid))\nsetInterval(() => {}, 1000)\n`
-  )
-  if (options.command !== 'missing') {
-    const commandPath = path.join(bin, 'pnpm')
     await writeFile(
-      commandPath,
-      `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { readFile, writeFile } from 'node:fs/promises'\nconst args = process.argv.slice(2)\nawait writeFile(${JSON.stringify(log)}, (await readFile(${JSON.stringify(log)}, 'utf8')) + args.join(' ') + '\\n')\nif (process.env.CHECK_CHANGED_HANG === '1') {\n  spawn(process.execPath, ['worker.js'], { cwd: process.cwd(), stdio: 'ignore' })\n  for (let attempt = 0; attempt < 250; attempt++) {\n    if (await readFile(${JSON.stringify(ready)}, 'utf8').catch(() => '')) break\n    await new Promise((resolve) => setTimeout(resolve, 20))\n  }\n  setInterval(() => {}, 1000)\n}\n`,
-      { mode: 0o755 }
+      path.join(root, 'worker.js'),
+      `import { writeFile } from 'node:fs/promises'\nprocess.on('SIGTERM', () => {})\nawait writeFile(${JSON.stringify(ready)}, String(process.pid))\nsetInterval(() => {}, 1000)\n`
     )
-  }
+    if (options.command !== 'missing') {
+      const commandPath = path.join(bin, 'pnpm')
+      await writeFile(
+        commandPath,
+        `#!${process.execPath}\nimport { spawn } from 'node:child_process'\nimport { readFile, writeFile } from 'node:fs/promises'\nconst args = process.argv.slice(2)\nawait writeFile(${JSON.stringify(log)}, (await readFile(${JSON.stringify(log)}, 'utf8')) + args.join(' ') + '\\n')\nif (process.env.CHECK_CHANGED_HANG === '1') {\n  spawn(process.execPath, ['worker.js'], { cwd: process.cwd(), stdio: 'ignore' })\n  for (let attempt = 0; attempt < 250; attempt++) {\n    if (await readFile(${JSON.stringify(ready)}, 'utf8').catch(() => '')) break\n    await new Promise((resolve) => setTimeout(resolve, 20))\n  }\n  setInterval(() => {}, 1000)\n}\n`,
+        { mode: 0o755 }
+      )
+    }
 
-  if (options.hook) {
-    const hookPath = path.join(directory, 'process-hook.cjs')
-    const recordTerm = options.hook === 'record-term'
-    await writeFile(
-      hookPath,
-      `const original = process.kill.bind(process)\nlet killedGroup = null\nprocess.kill = (pid, signal) => {\n  if (pid < 0 && signal === 'SIGTERM') require('node:fs').writeFileSync(${JSON.stringify(termSent)}, 'yes')\n  if (pid < 0 && signal === 'SIGKILL') { killedGroup = pid; return original(pid, signal) }\n  if (${recordTerm ? 'false' : 'true'} && pid === killedGroup && signal === 0) return true\n  return original(pid, signal)\n}\n`
-    )
-  }
+    if (options.hook) {
+      const hookPath = path.join(directory, 'process-hook.cjs')
+      const recordTerm = options.hook === 'record-term'
+      await writeFile(
+        hookPath,
+        `const original = process.kill.bind(process)\nlet killedGroup = null\nprocess.kill = (pid, signal) => {\n  if (pid < 0 && signal === 'SIGTERM') require('node:fs').writeFileSync(${JSON.stringify(termSent)}, 'yes')\n  if (pid < 0 && signal === 'SIGKILL') { killedGroup = pid; return original(pid, signal) }\n  if (${recordTerm ? 'false' : 'true'} && pid === killedGroup && signal === 0) return true\n  return original(pid, signal)\n}\n`
+      )
+    }
 
-  await chmod(directory, 0o755)
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    PATH: `${bin}${path.delimiter}${supportBin}`,
+    await chmod(directory, 0o755)
+    const env: NodeJS.ProcessEnv = {
+      ...gitEnv,
+      PATH: `${bin}${path.delimiter}${supportBin}`,
+    }
+    delete env.NODE_OPTIONS
+    delete env.CHECK_CHANGED_HANG
+    if (options.command === 'hang') env.CHECK_CHANGED_HANG = '1'
+    if (options.hook) {
+      env.NODE_OPTIONS =
+        `${env.NODE_OPTIONS ?? ''} --require=${path.join(directory, 'process-hook.cjs')}`.trim()
+    }
+    return { directory, root, bin, log, ready, termSent, base, env }
+  } catch (error) {
+    await rm(directory, { recursive: true, force: true })
+    throw error
   }
-  delete env.CHECK_CHANGED_HANG
-  if (options.command === 'hang') env.CHECK_CHANGED_HANG = '1'
-  if (options.hook) {
-    env.NODE_OPTIONS =
-      `${env.NODE_OPTIONS ?? ''} --require=${path.join(directory, 'process-hook.cjs')}`.trim()
-  }
-  return { directory, root, bin, log, ready, termSent, base, env }
 }
 
 function launch(f: Fixture): ChildProcess {
-  return spawn(
+  const child = spawn(
     process.execPath,
     ['--import=@poppinss/ts-exec', path.join(f.root, 'bin/check_changed.ts'), '--static', f.base],
     { cwd: f.root, env: f.env, stdio: ['ignore', 'pipe', 'pipe'] }
   )
+  f.child = child
+  return child
+}
+
+function assertOnlyFormatCommand(log: string): void {
+  assert.deepEqual(log.trimEnd().split('\n'), [
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+  ])
+}
+
+test('command log assertions reject later lint and typecheck invocations', () => {
+  for (const command of ['lint', 'typecheck']) {
+    assert.throws(() =>
+      assertOnlyFormatCommand(
+        `exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js\n${command}\n`
+      )
+    )
+  }
+})
+
+async function cleanupFixture(f: Fixture): Promise<void> {
+  const child = f.child
+  if (child && child.exitCode === null && child.signalCode === null) {
+    child.kill('SIGTERM')
+    await Promise.race([
+      new Promise<void>((resolve) => child.once('close', () => resolve())),
+      new Promise<void>((resolve) => setTimeout(resolve, 500)),
+    ])
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+  }
+  await rm(f.directory, { recursive: true, force: true })
 }
 
 test('runs selected static checks normally and observes a missing command spawn error', async ({
   cleanup,
 }) => {
   const normal = await fixture()
-  cleanup(() => rm(normal.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(normal))
   const normalChild = launch(normal)
-  const normalOutput = await outputOf(normalChild)
-  const normalResult = await collectExit(normalChild, normalOutput)
+  const normalOutput = outputOf(normalChild)
+  const normalResult = await normalOutput
   assert.equal(normalResult.code, 0, normalResult.text)
   assert.match(normalResult.text, /pass format/)
   assert.match(await readFile(normal.log, 'utf8'), /exec prettier --check/)
 
   const missing = await fixture({ command: 'missing' })
-  cleanup(() => rm(missing.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(missing))
   const missingChild = launch(missing)
-  const missingOutput = await outputOf(missingChild)
-  const missingResult = await collectExit(missingChild, missingOutput)
+  const missingOutput = outputOf(missingChild)
+  const missingResult = await missingOutput
   assert.equal(missingResult.code, 1, missingResult.text)
   assert.match(missingResult.text, /spawn failed: spawn pnpm ENOENT/)
   assert.doesNotMatch(missingResult.text, /UnhandledPromiseRejection|unhandledRejection/)
@@ -129,16 +191,15 @@ test('TERM-resistant descendants receive KILL, are reaped, and block later selec
   cleanup,
 }) => {
   const f = await fixture({ command: 'hang' })
-  cleanup(() => rm(f.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(f))
   const child = launch(f)
-  const output = await outputOf(child)
-  await waitForFile(f.ready)
-  const descendantPid = Number(await readFile(f.ready, 'utf8'))
+  const output = outputOf(child)
+  const descendantPid = await waitForPid(f.ready)
   child.kill('SIGTERM')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /fail format \(exit killed\)/)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
   assert.equal(await isAlive(descendantPid), false)
   assert.doesNotMatch(result.text, /UnhandledPromiseRejection|unhandledRejection/)
 }).timeout(20_000)
@@ -147,31 +208,30 @@ test('a second signal escalates immediately while the first signal determines th
   cleanup,
 }) => {
   const f = await fixture({ command: 'hang', hook: 'record-term' })
-  cleanup(() => rm(f.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(f))
   const child = launch(f)
-  const output = await outputOf(child)
-  await waitForFile(f.ready)
-  const descendantPid = Number(await readFile(f.ready, 'utf8'))
+  const output = outputOf(child)
+  const descendantPid = await waitForPid(f.ready)
   child.kill('SIGTERM')
   await waitForFile(f.termSent)
   child.kill('SIGINT')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.equal(await isAlive(descendantPid), false)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
 }).timeout(15_000)
 
 test('reports failed final reap and retains the first signal result', async ({ cleanup }) => {
   const f = await fixture({ command: 'hang', hook: 'fail-reap' })
-  cleanup(() => rm(f.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(f))
   const child = launch(f)
-  const output = await outputOf(child)
-  await waitForFile(f.ready)
+  const output = outputOf(child)
+  await waitForPid(f.ready)
   child.kill('SIGTERM')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /cleanup failed:.*did not exit after SIGKILL/s)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
   assert.doesNotMatch(result.text, /UnhandledPromiseRejection|unhandledRejection/)
 }).timeout(20_000)
 
@@ -179,7 +239,7 @@ test('interrupt settles a never-closing owned child and releases its live local 
   cleanup,
 }) => {
   const f = await fixture()
-  cleanup(() => rm(f.directory, { recursive: true, force: true }))
+  cleanup(() => cleanupFixture(f))
   const hook = path.join(f.directory, 'never-close.cjs')
   await writeFile(
     hook,
@@ -202,11 +262,157 @@ require('node:module').syncBuiltinESMExports()
   )
   f.env.NODE_OPTIONS = `${f.env.NODE_OPTIONS ?? ''} --require=${hook}`
   const child = launch(f)
-  const output = await outputOf(child)
-  const result = await collectExit(child, output)
+  const output = outputOf(child)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /did not exit after SIGKILL/)
   assert.match(result.text, /partial output/)
+  assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
+  assert.equal(await readFile(f.log, 'utf8'), '')
+}).timeout(10_000)
+
+test('exit collector registers before exit and includes output drained before close', async () => {
+  const stdout = new PassThrough()
+  const stderr = new PassThrough()
+  const child = Object.assign(new EventEmitter(), {
+    stdout,
+    stderr,
+  }) as unknown as ChildProcess
+  const result = outputOf(child)
+  child.emit('exit', 0, null)
+  stdout.write('last stdout')
+  stderr.write(' and stderr')
+  child.emit('close', 0, null)
+  assert.deepEqual(await result, { code: 0, signal: null, text: 'last stdout and stderr' })
+})
+
+test('PID readiness waits for a complete record and preserves read errors', async ({ cleanup }) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-pid-readiness-'))
+  cleanup(() => rm(directory, { recursive: true, force: true }))
+  const pidFile = path.join(directory, 'pid')
+  await writeFile(pidFile, '')
+  const pending = waitForPid(pidFile, 1000)
+  await writeFile(pidFile, '12345')
+  assert.equal(await pending, 12345)
+  await assert.rejects(waitForPid(directory, 100), { code: 'EISDIR' })
+})
+
+test('fixture removes its directory when setup fails', async () => {
+  let directory: string | undefined
+  await assert.rejects(
+    fixture({
+      onDirectory: (value) => (directory = value),
+      failSetup: true,
+    }),
+    /fixture setup failed/
+  )
+  assert.ok(directory)
+  await assert.rejects(readFile(directory, 'utf8'), { code: 'ENOENT' })
+})
+
+test('fixture ignores hostile inherited Git configuration and Node preloads', async ({
+  cleanup,
+}) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-hostile-settings-'))
+  cleanup(() => rm(directory, { recursive: true, force: true }))
+  const hooks = path.join(directory, 'hooks')
+  await mkdir(hooks)
+  await writeFile(path.join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+  const globalConfig = path.join(directory, 'global-gitconfig')
+  await writeFile(globalConfig, `[commit]\n gpgsign = true\n[core]\n hooksPath = ${hooks}\n`)
+  const preload = path.join(directory, 'poison.cjs')
+  await writeFile(preload, `throw new Error('unexpected inherited preload')\n`)
+  const f = await fixture({
+    inheritedEnv: {
+      GIT_CONFIG_GLOBAL: globalConfig,
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'commit.gpgsign',
+      GIT_CONFIG_VALUE_0: 'true',
+      NODE_OPTIONS: `--require=${preload}`,
+    },
+  })
+  cleanup(() => cleanupFixture(f))
+  const result = await outputOf(launch(f))
+  assert.equal(result.code, 0, result.text)
+  const log = await readFile(f.log, 'utf8')
+  assert.deepEqual(log.trimEnd().split('\n'), [
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+    'lint',
+    'typecheck',
+  ])
+})
+
+for (const signalFails of [false, true]) {
+  test(`timeout settles a nonclosing child when signal delivery ${signalFails ? 'fails' : 'succeeds'}`, async ({
+    cleanup,
+  }) => {
+    const f = await fixture()
+    cleanup(() => cleanupFixture(f))
+    const hook = path.join(f.directory, 'timeout-hook.cjs')
+    await writeFile(
+      hook,
+      `
+const cp = require('node:child_process')
+const { EventEmitter } = require('node:events')
+const { PassThrough } = require('node:stream')
+const originalTimeout = global.setTimeout
+global.setTimeout = (callback, ms, ...args) => ms === 900000 ? originalTimeout(callback, 0, ...args) : originalTimeout(callback, ms, ...args)
+cp.spawn = () => {
+ const child = new EventEmitter(); child.pid = 99999999; child.exitCode = child.signalCode = null
+ child.stdout = new PassThrough(); child.stderr = new PassThrough()
+ const liveHandle = setInterval(() => {}, 1000)
+ child.unref = () => { clearInterval(liveHandle); console.log('LOCAL_HANDLE_RELEASED') }
+ process.nextTick(() => child.stdout.write('partial output'))
+ return child
+}
+
+process.kill = (_pid, signal) => {
+ if (signal === 'SIGKILL' && ${signalFails}) { const error = new Error('signal denied'); error.code = 'EPERM'; throw error }
+ if (signal === 0) { const error = new Error('gone'); error.code = 'ESRCH'; throw error }
+ return true
+}
+require('node:module').syncBuiltinESMExports()
+`
+    )
+    f.env.NODE_OPTIONS = `--require=${hook}`
+    const result = await outputOf(launch(f))
+    assert.equal(result.code, 1, result.text)
+    assert.match(result.text, /stopped after 15 minutes/)
+    assert.match(result.text, /partial output/)
+    assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
+    assert.equal(await readFile(f.log, 'utf8'), '')
+    if (signalFails) assert.match(result.text, /timeout cleanup failed: signal denied/)
+  }).timeout(10_000)
+}
+
+test('interrupt settles a nonclosing child after successful cleanup', async ({ cleanup }) => {
+  const f = await fixture()
+  cleanup(() => cleanupFixture(f))
+  const hook = path.join(f.directory, 'interrupt-hook.cjs')
+  await writeFile(
+    hook,
+    `
+const cp = require('node:child_process')
+const { EventEmitter } = require('node:events')
+const { PassThrough } = require('node:stream')
+cp.spawn = () => {
+ const child = new EventEmitter(); child.pid = 99999999; child.exitCode = child.signalCode = null
+ child.stdout = new PassThrough(); child.stderr = new PassThrough()
+ const liveHandle = setInterval(() => {}, 1000)
+ child.unref = () => { clearInterval(liveHandle); console.log('LOCAL_HANDLE_RELEASED') }
+ setImmediate(() => process.emit('SIGTERM'))
+ return child
+}
+process.kill = (_pid, signal) => {
+ if (signal === 0) { const error = new Error('gone'); error.code = 'ESRCH'; throw error }
+ return true
+}
+require('node:module').syncBuiltinESMExports()
+`
+  )
+  f.env.NODE_OPTIONS = `--require=${hook}`
+  const result = await outputOf(launch(f))
+  assert.equal(result.code, 143, result.text)
   assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
   assert.equal(await readFile(f.log, 'utf8'), '')
 }).timeout(10_000)
