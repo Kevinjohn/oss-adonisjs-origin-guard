@@ -58,15 +58,20 @@ const bootstrap = `
 `
 
 function startFixture(appUrl: string, corsOrigins: string) {
-  return spawnSync(
-    '/home/dev/.nvm/versions/node/v24.22.2/bin/node',
+  const result = spawnSync(
+    process.execPath,
     ['--import=@poppinss/ts-exec', '--input-type=module', '-e', bootstrap],
     {
       cwd: repositoryRoot,
       encoding: 'utf8',
       env: { ...process.env, APP_URL: appUrl, CORS_ORIGINS: corsOrigins, NODE_ENV: 'test' },
+      timeout: 10_000,
+      killSignal: 'SIGKILL',
     }
   )
+  if (result.error)
+    throw new Error(`Could not complete Adonis startup fixture: ${result.error.message}`)
+  return result
 }
 
 test.group('eager origin validation during Adonis startup', () => {
