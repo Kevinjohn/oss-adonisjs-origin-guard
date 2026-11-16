@@ -69,7 +69,7 @@ async function fixture(
   await writeFile(path.join(bin, 'shasum'), `#!/bin/bash\n${hashOutput}\n`, { mode: 0o755 })
   const outputFile = path.join(directory, 'github-output')
   await writeFile(outputFile, '')
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}:/usr/bin:/bin`,
     GITHUB_OUTPUT: outputFile,
