@@ -17,6 +17,7 @@ const plannerPath = path.join(repoRoot, 'bin/check_changed_plan.ts')
 type FixtureOptions = {
   command?: 'normal' | 'hang' | 'missing'
   hook?: 'record-term' | 'fail-reap'
+  inheritedEnv?: NodeJS.ProcessEnv
   onDirectory?: (directory: string) => void
   failSetup?: boolean
 }
@@ -52,13 +53,30 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
 
     const git = execFileSync('which', ['git'], { encoding: 'utf8' }).trim()
     await symlink(git, path.join(supportBin, 'git'))
-    const runGit = (args: string[]) => execFileSync(git, args, { cwd: root, stdio: 'ignore' })
+    const gitEnv = {
+      ...process.env,
+      ...options.inheritedEnv,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_GLOBAL: path.join(directory, 'empty-gitconfig'),
+      GIT_CONFIG_COUNT: '0',
+      GIT_CONFIG_PARAMETERS: '',
+      GIT_CONFIG: path.join(directory, 'empty-gitconfig'),
+    }
+    const runGit = (args: string[]) =>
+      execFileSync(git, args, { cwd: root, env: gitEnv, stdio: 'ignore' })
     runGit(['init', '-q'])
     runGit(['config', 'user.email', 'fixture@example.test'])
     runGit(['config', 'user.name', 'Fixture'])
+    runGit(['config', 'commit.gpgsign', 'false'])
+    runGit(['config', 'core.hooksPath', path.join(directory, 'empty-hooks')])
+    await mkdir(path.join(directory, 'empty-hooks'))
     runGit(['add', '.'])
     runGit(['commit', '-qm', 'fixture baseline'])
-    const base = execFileSync(git, ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+    const base = execFileSync(git, ['rev-parse', 'HEAD'], {
+      cwd: root,
+      env: gitEnv,
+      encoding: 'utf8',
+    }).trim()
     await writeFile(path.join(root, 'src-trigger.ts'), 'export const changed = true\n')
     runGit(['add', 'src-trigger.ts'])
     runGit(['commit', '-qm', 'select static checks'])
@@ -91,9 +109,10 @@ async function fixture(options: FixtureOptions = {}): Promise<Fixture> {
 
     await chmod(directory, 0o755)
     const env: NodeJS.ProcessEnv = {
-      ...process.env,
+      ...gitEnv,
       PATH: `${bin}${path.delimiter}${supportBin}`,
     }
+    delete env.NODE_OPTIONS
     delete env.CHECK_CHANGED_HANG
     if (options.command === 'hang') env.CHECK_CHANGED_HANG = '1'
     if (options.hook) {
@@ -273,4 +292,36 @@ test('fixture removes its directory when setup fails', async () => {
   )
   assert.ok(directory)
   await assert.rejects(readFile(directory, 'utf8'), { code: 'ENOENT' })
+})
+
+test('fixture ignores hostile inherited Git configuration and Node preloads', async ({
+  cleanup,
+}) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-hostile-settings-'))
+  cleanup(() => rm(directory, { recursive: true, force: true }))
+  const hooks = path.join(directory, 'hooks')
+  await mkdir(hooks)
+  await writeFile(path.join(hooks, 'pre-commit'), '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+  const globalConfig = path.join(directory, 'global-gitconfig')
+  await writeFile(globalConfig, `[commit]\n gpgsign = true\n[core]\n hooksPath = ${hooks}\n`)
+  const preload = path.join(directory, 'poison.cjs')
+  await writeFile(preload, `throw new Error('unexpected inherited preload')\n`)
+  const f = await fixture({
+    inheritedEnv: {
+      GIT_CONFIG_GLOBAL: globalConfig,
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'commit.gpgsign',
+      GIT_CONFIG_VALUE_0: 'true',
+      NODE_OPTIONS: `--require=${preload}`,
+    },
+  })
+  cleanup(() => cleanupFixture(f))
+  const result = await outputOf(launch(f))
+  assert.equal(result.code, 0, result.text)
+  const log = await readFile(f.log, 'utf8')
+  assert.deepEqual(log.trimEnd().split('\n'), [
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+    'lint',
+    'typecheck',
+  ])
 })
