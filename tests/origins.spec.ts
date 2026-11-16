@@ -29,9 +29,19 @@ test.group('parseOrigins', () => {
     ]) {
       assert.throws(
         () => parseOrigins(invalid),
-        `Invalid CORS origin ${JSON.stringify(invalid)}: expected a bare HTTP(S) origin`
+        'Invalid CORS origin at position 1: expected a bare HTTP(S) origin'
       )
     }
+  })
+
+  test('reports the entry position without echoing invalid values', ({ assert }) => {
+    const rejected = 'https://user:dummy-secret@wayne.example?token=dummy-query'
+    const error = assert.throws(() => parseOrigins(`https://wayne.example, ${rejected}`))
+
+    assert.include(error.message, 'Invalid CORS origin at position 2:')
+    assert.notInclude(error.message, rejected)
+    assert.notInclude(error.message, 'dummy-secret')
+    assert.notInclude(error.message, 'dummy-query')
   })
 })
 
