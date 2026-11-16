@@ -104,6 +104,13 @@ import { isPrivatePeer } from '@kevinjohn/adonisjs-origin-guard'
 export const http = defineConfig({ trustProxy: isPrivatePeer })
 ```
 
+AdonisJS uses `trustProxy` against the immediate socket peer when deciding whether to use forwarded
+host and protocol metadata. Its client-IP lookup can walk the `X-Forwarded-For` address chain,
+stopping at the first untrusted address. This helper checks address ranges, not proxy identity: only
+use it when your network prevents untrusted clients from reaching the app through a trusted private
+address. If only specific proxies are trusted, provide a predicate for those peers instead. The
+application still needs network rules that control who can supply forwarded headers.
+
 ## Development
 
 ```sh
