@@ -16,7 +16,7 @@ host passes every value in. The host must declare `APP_URL` in `start/env.ts`, f
 Releases are GitHub release tarballs; the package is not on the npm registry.
 
 ```sh
-pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.1.0/kevinjohn-adonisjs-origin-guard-0.1.0.tgz
+pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.2.0/kevinjohn-adonisjs-origin-guard-0.2.0.tgz
 ```
 
 There is no provider and nothing to configure with `node ace configure`.
