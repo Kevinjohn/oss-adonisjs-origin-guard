@@ -38,14 +38,14 @@ test.group('parseOrigins', () => {
     const rejected = 'https://user:dummy-secret@wayne.example?token=dummy-query'
     let thrown: unknown
     try {
-      parseOrigins(`https://wayne.example, ${rejected}`)
+      parseOrigins(`https://wayne.example, , ${rejected}`)
     } catch (error) {
       thrown = error
     }
 
     assert.isTrue(thrown instanceof Error)
     const message = thrown instanceof Error ? thrown.message : ''
-    assert.include(message, 'Invalid CORS origin at position 2:')
+    assert.include(message, 'Invalid CORS origin at position 3:')
     assert.notInclude(message, rejected)
     assert.notInclude(message, 'dummy-secret')
     assert.notInclude(message, 'dummy-query')
