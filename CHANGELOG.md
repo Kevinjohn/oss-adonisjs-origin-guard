@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-16
+
 - Document eager HTTP startup validation, the required host environment setting, normalized origin
   parsing, direct guard configuration, proxy trust boundaries and the contributor runtime.
 - Report invalid configured origins by entry position without echoing their values.
