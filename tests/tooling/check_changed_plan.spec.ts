@@ -45,6 +45,14 @@ test('files the specs read run the full suite without building the package', ({ 
   }
 })
 
+test('story-only changes keep the selected suite but do not build the package', ({ assert }) => {
+  const plan = planChangedChecks(changed('user-stories/README.md'))
+  const commands = ran(plan)
+
+  assert.deepEqual(commands.tests, ['pnpm', 'quick:test'])
+  assert.notProperty(commands, 'build')
+})
+
 test('lockfile and workspace changes run lint and typecheck', ({ assert }) => {
   for (const path of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     assert.properties(ran(planChangedChecks(changed(path))), ['lint', 'typecheck'], path)
