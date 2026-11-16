@@ -84,8 +84,8 @@ such as a script using a bare HTTP library, must send `Origin`.
 
 - `parseOrigins(list)` takes a comma-separated string and returns each origin in the form a browser
   sends. It throws on `*` and on any entry whose WHATWG-parsed URL has credentials, a path other
-  than `/`, a non-empty query or a non-empty fragment. Errors report the one-based entry position
-  without echoing the rejected value. Parsing normalizes equivalent URL spellings, such as host
+  than `/`, a non-empty query or a non-empty fragment. Malformed entries report the one-based
+  position without echoing the rejected value. Parsing normalizes equivalent URL spellings, such as host
   case, default ports and a root slash, before returning `URL.origin`.
 - `resolvePublicOrigin(value, environment, variable)` validates the one origin the application is
   served from and returns `{ origin, secure }`. HTTPS is required in production, and outside
