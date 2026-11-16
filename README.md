@@ -72,6 +72,11 @@ stack does not run. `Origin` is compared as sent: nothing is normalised, and `Ho
 protocol are never consulted. `isTrustedUnsafeOrigin(headers, config)` is the same decision as a
 function.
 
+Pass a `publicOrigin` produced by `resolvePublicOrigin` and `allowedOrigins` produced by
+`parseOrigins` (or an equivalent validated serialized HTTP(S) origin list). Validate host-owned
+settings once during eager startup as shown below. The per-request guard compares headers with that
+configuration; it does not parse or revalidate the configured origins on each request.
+
 Turn off Shield's token-based CSRF if this guard replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
 
