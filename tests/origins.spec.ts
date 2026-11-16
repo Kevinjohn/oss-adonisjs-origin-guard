@@ -36,12 +36,19 @@ test.group('parseOrigins', () => {
 
   test('reports the entry position without echoing invalid values', ({ assert }) => {
     const rejected = 'https://user:dummy-secret@wayne.example?token=dummy-query'
-    const error = assert.throws(() => parseOrigins(`https://wayne.example, ${rejected}`))
+    let thrown: unknown
+    try {
+      parseOrigins(`https://wayne.example, ${rejected}`)
+    } catch (error) {
+      thrown = error
+    }
 
-    assert.include(error.message, 'Invalid CORS origin at position 2:')
-    assert.notInclude(error.message, rejected)
-    assert.notInclude(error.message, 'dummy-secret')
-    assert.notInclude(error.message, 'dummy-query')
+    assert.isTrue(thrown instanceof Error)
+    const message = thrown instanceof Error ? thrown.message : ''
+    assert.include(message, 'Invalid CORS origin at position 2:')
+    assert.notInclude(message, rejected)
+    assert.notInclude(message, 'dummy-secret')
+    assert.notInclude(message, 'dummy-query')
   })
 })
 
