@@ -136,6 +136,22 @@ function launch(f: Fixture): ChildProcess {
   return child
 }
 
+function assertOnlyFormatCommand(log: string): void {
+  assert.deepEqual(log.trimEnd().split('\n'), [
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+  ])
+}
+
+test('command log assertions reject later lint and typecheck invocations', () => {
+  for (const command of ['lint', 'typecheck']) {
+    assert.throws(() =>
+      assertOnlyFormatCommand(
+        `exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js\n${command}\n`
+      )
+    )
+  }
+})
+
 async function cleanupFixture(f: Fixture): Promise<void> {
   const child = f.child
   if (child && child.exitCode === null && child.signalCode === null) {
@@ -183,7 +199,7 @@ test('TERM-resistant descendants receive KILL, are reaped, and block later selec
   const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /fail format \(exit killed\)/)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
   assert.equal(await isAlive(descendantPid), false)
   assert.doesNotMatch(result.text, /UnhandledPromiseRejection|unhandledRejection/)
 }).timeout(20_000)
@@ -202,7 +218,7 @@ test('a second signal escalates immediately while the first signal determines th
   const result = await output
   assert.equal(result.code, 143, result.text)
   assert.equal(await isAlive(descendantPid), false)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
 }).timeout(15_000)
 
 test('reports failed final reap and retains the first signal result', async ({ cleanup }) => {
@@ -215,7 +231,7 @@ test('reports failed final reap and retains the first signal result', async ({ c
   const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /cleanup failed:.*did not exit after SIGKILL/s)
-  assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
+  assertOnlyFormatCommand(await readFile(f.log, 'utf8'))
   assert.doesNotMatch(result.text, /UnhandledPromiseRejection|unhandledRejection/)
 }).timeout(20_000)
 
