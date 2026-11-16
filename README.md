@@ -37,9 +37,9 @@ export const originGuardConfig = {
 ```
 
 Import that module from `start/kernel.ts` before registering the lazy middleware. AdonisJS loads
-the kernel during HTTP startup; this eager import makes invalid origin settings stop boot, before
-the first request. Keep the middleware import lazy, and have it consume the already evaluated
-configuration:
+the kernel during HTTP startup; this eager import makes invalid origin settings stop startup
+before the HTTP server begins handling requests. Keep the middleware import lazy, and have it consume
+the already evaluated configuration:
 
 ```ts
 // app/middleware/origin_guard_middleware.ts
