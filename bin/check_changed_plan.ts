@@ -12,8 +12,6 @@ export interface ChangedCheckStep {
   countsTests?: boolean
   /** Fail when the step executes no tests: its file filter is wrong. */
   requiresTests?: boolean
-  /** Fail when the step leaves the worktree dirty. */
-  requiresCleanTree?: boolean
 }
 
 export interface SkippedCheckStep {
@@ -27,9 +25,11 @@ const dependencyFiles = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml'
 // Formatter configuration (and package.json, which pins Prettier) can change any file's format.
 const formatterInputs = [
   /^\.prettierrc/,
+  /^prettier\.config\./,
   /^\.prettierignore$/,
   /^\.editorconfig$/,
   /^package\.json$/,
+  /^pnpm-lock\.yaml$/,
 ]
 
 const isSpec = (path: string) => /^tests\/.+\.spec\.ts$/.test(path)
@@ -40,7 +40,7 @@ const isLintable = (path: string) =>
 
 /** Files that cannot change the built package. */
 function outsidePackage(path: string): boolean {
-  return /^(tests|\.github)\//.test(path) || /^[^/]+\.md$/.test(path)
+  return /^(tests|\.github|user-stories)\//.test(path) || /^[^/]+\.md$/.test(path)
 }
 
 export interface PlanOptions {

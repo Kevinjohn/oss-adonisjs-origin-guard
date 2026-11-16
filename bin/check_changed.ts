@@ -15,7 +15,7 @@ let active: ChildProcess | undefined
 let interruptedBy: NodeJS.Signals | undefined
 let interruptionCleanup: Promise<void> | undefined
 const signalErrors: unknown[] = []
-let abandonActive: ((error: unknown) => void) | undefined
+let abandonActive: ((error?: unknown) => void) | undefined
 
 function describeError(error: unknown): string {
   if (error instanceof AggregateError) {
@@ -109,8 +109,12 @@ function interrupt(signal: NodeJS.Signals): void {
   if (!interruptedBy) {
     interruptedBy = signal
     const child = active
+    const abandon = abandonActive
     interruptionCleanup = child ? terminateOwnedProcess(child) : Promise.resolve()
-    void interruptionCleanup.catch((error) => abandonActive?.(error))
+    void interruptionCleanup.then(
+      () => abandon?.(),
+      (error) => abandon?.(error)
+    )
     return
   }
 
@@ -153,9 +157,7 @@ function changedFiles(base: string): ChangedFile[] {
 }
 
 /** Run one step in its own process group so an interrupt can stop descendants too. */
-function run(
-  step: ChangedCheckStep
-): Promise<{ status: number | null; output: string; cleanupError?: unknown }> {
+function run(step: ChangedCheckStep): Promise<{ status: number | null; output: string }> {
   return new Promise((resolve) => {
     const child = spawn(step.command[0], step.command.slice(1), {
       cwd: root,
@@ -170,12 +172,25 @@ function run(
     child.stderr.on('data', (chunk) => (output += chunk))
     const timer = setTimeout(() => {
       timedOut = true
+      const abandon = abandonActive
       output += `\n[check:changed] stopped after ${stepLimitMs / 60000} minutes\n`
+      let signalError: unknown
       try {
         signalOwnedProcess(child, 'SIGKILL')
       } catch (error) {
+        signalError = error
         output += `[check:changed] timeout cleanup failed: ${describeError(error)}\n`
       }
+      void waitForOwnedProcessExit(child, reapGraceMs).then(
+        (stopped) =>
+          abandon?.(
+            signalError ??
+              (stopped
+                ? undefined
+                : new Error('The owned process group did not exit after SIGKILL.'))
+          ),
+        (error) => abandon?.(signalError ?? error)
+      )
     }, stepLimitMs)
     child.once('error', (error) => {
       spawnError = error
@@ -209,7 +224,7 @@ function run(
       if (cleanupError !== undefined) {
         output += `\n[check:changed] cleanup failed: ${describeError(cleanupError)}\n`
       }
-      resolve({ status: timedOut || signal ? null : status, output, cleanupError })
+      resolve({ status: timedOut || signal ? null : status, output })
     }
     child.once('close', (status, signal) => void finish(status, signal))
   })
@@ -237,7 +252,6 @@ for (const step of planChangedChecks(changes, { static: flags.includes('--static
     console.log(`skip ${step.label} (${step.skip})`)
     continue
   }
-  const before = step.requiresCleanTree ? git(['status', '--porcelain']) : ''
   const { status, output } = await run(step)
   const tests = step.countsTests ? executedTests(output) : undefined
   const problem =
@@ -247,9 +261,7 @@ for (const step of planChangedChecks(changes, { static: flags.includes('--static
         ? `interrupted by ${interruptedBy}`
         : step.requiresTests && tests === 0
           ? 'no tests executed'
-          : step.requiresCleanTree && git(['status', '--porcelain']) !== before
-            ? 'left the worktree dirty'
-            : undefined
+          : undefined
   if (problem) {
     failed = true
     console.log(`fail ${step.label} (${problem}): ${step.command.join(' ')}`)

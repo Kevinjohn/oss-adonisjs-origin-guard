@@ -45,6 +45,14 @@ test('files the specs read run the full suite without building the package', ({ 
   }
 })
 
+test('story-only changes keep the selected suite but do not build the package', ({ assert }) => {
+  const plan = planChangedChecks(changed('user-stories/README.md'))
+  const commands = ran(plan)
+
+  assert.deepEqual(commands.tests, ['pnpm', 'quick:test'])
+  assert.notProperty(commands, 'build')
+})
+
 test('lockfile and workspace changes run lint and typecheck', ({ assert }) => {
   for (const path of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
     assert.properties(ran(planChangedChecks(changed(path))), ['lint', 'typecheck'], path)
@@ -70,15 +78,25 @@ test('deleted files select checks but are never passed to tools', ({ assert }) =
 })
 
 test('formats only existing files and leaves the lockfile to pnpm', ({ assert }) => {
-  const commands = ran(planChangedChecks(changed('README.md', 'pnpm-lock.yaml')))
+  const commands = ran(planChangedChecks(changed('README.md')))
 
   assert.deepEqual(commands.format.slice(-1), ['README.md'])
   assert.include(commands.format, '--ignore-unknown')
   assert.include(commands.format, '--no-error-on-unmatched-pattern')
+  assert.deepEqual(ran(planChangedChecks(changed('pnpm-lock.yaml'))).format, [
+    'pnpm',
+    'format:check',
+  ])
 })
 
 test('formatter configuration checks the whole tree', ({ assert }) => {
-  for (const path of ['.prettierignore', '.editorconfig', 'package.json'])
+  for (const path of [
+    '.prettierignore',
+    '.editorconfig',
+    'package.json',
+    'prettier.config.js',
+    'pnpm-lock.yaml',
+  ])
     assert.deepEqual(ran(planChangedChecks(changed(path))).format, ['pnpm', 'format:check'], path)
 })
 

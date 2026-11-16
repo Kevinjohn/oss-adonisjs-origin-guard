@@ -5,17 +5,20 @@ export interface PublicOrigin {
 }
 
 /**
- * Parses a comma-separated list of origins. Blank entries are skipped and each remaining entry is
- * returned in the serialized form a browser sends in `Origin`.
+ * Parses a comma-separated list of origins with the WHATWG `URL` parser. Blank entries are skipped;
+ * each remaining entry is returned as `URL.origin`, normalizing spellings such as host case,
+ * default ports and a trailing root slash before checking the parsed URL's components.
  * @throws Error when an entry is `*`, since credentialed requests need explicit origins.
- * @throws Error when an entry is not a bare HTTP(S) origin: no credentials, path, query or fragment.
+ * @throws Error when a parsed entry is not HTTP(S), has credentials, a path other than `/`, a
+ * non-empty query or a non-empty fragment. The message reports its one-based list position without
+ * echoing the entry.
  */
 export function parseOrigins(list: string): string[] {
   return list
     .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-    .map((origin) => {
+    .map((origin, index) => ({ origin: origin.trim(), position: index + 1 }))
+    .filter(({ origin }) => Boolean(origin))
+    .map(({ origin, position }) => {
       if (origin === '*') {
         throw new Error('CORS requires explicit origins when credentials are enabled')
       }
@@ -35,7 +38,7 @@ export function parseOrigins(list: string): string[] {
         parsed.hash
       ) {
         throw new Error(
-          `Invalid CORS origin ${JSON.stringify(origin)}: expected a bare HTTP(S) origin`
+          `Invalid CORS origin at position ${position}: expected a bare HTTP(S) origin`
         )
       }
       return parsed.origin

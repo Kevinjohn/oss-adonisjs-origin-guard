@@ -17,16 +17,20 @@ As an application operator, I want AdonisJS to trust forwarded headers only from
 
 - Returns true for `127.0.0.0/8`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `::1` and `fc00::/7`, including IPv4-mapped IPv6 such as `::ffff:10.0.0.1`.
 - Returns false for every other address, and for anything that is not an IP address. It never throws.
+- AdonisJS checks the immediate socket peer when deciding whether to use forwarded host and protocol metadata. Its client-IP lookup can walk the `X-Forwarded-For` address chain and stops at the first untrusted address.
 - Which networks a deployment's proxy uses, and whether a private peer is trustworthy there, stay the operator's decision.
+- The operator must ensure untrusted clients cannot supply forwarded headers through a peer accepted by this predicate. Use a predicate limited to the intended proxy peers when private address ranges include untrusted systems.
 
 ## User flow
 
 ```mermaid
 flowchart TD
-    A["Operator sets trustProxy to isPrivatePeer"] --> B["Request arrives from a peer"]
-    B --> C{"Peer on loopback or a private network?"}
-    C -->|Yes| D["Application uses the forwarded client address and protocol"]
-    C -->|No| E["Application ignores forwarded headers and uses the peer itself"]
+    A["Operator sets trustProxy to isPrivatePeer"] --> B["Request arrives with a socket peer and optional forwarded headers"]
+    B --> C{"Immediate socket peer is loopback or private?"}
+    C -->|Yes| D["AdonisJS may use forwarded host and protocol metadata"]
+    C -->|No| E["AdonisJS uses request host and protocol"]
+    B --> F["For client-IP lookup, AdonisJS walks the X-Forwarded-For chain and stops at the first untrusted address"]
+    G["Operator network rules restrict who can reach the app through trusted peers"] -.-> C
 ```
 
 ## Code flow
