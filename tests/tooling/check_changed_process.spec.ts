@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { chmod, mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { spawn, type ChildProcess } from 'node:child_process'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { collectExit, isAlive, outputOf, waitForFile } from './child_process.js'
+import { isAlive, outputOf, waitForFile } from './child_process.js'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -109,8 +111,8 @@ test('runs selected static checks normally and observes a missing command spawn 
   const normal = await fixture()
   cleanup(() => rm(normal.directory, { recursive: true, force: true }))
   const normalChild = launch(normal)
-  const normalOutput = await outputOf(normalChild)
-  const normalResult = await collectExit(normalChild, normalOutput)
+  const normalOutput = outputOf(normalChild)
+  const normalResult = await normalOutput
   assert.equal(normalResult.code, 0, normalResult.text)
   assert.match(normalResult.text, /pass format/)
   assert.match(await readFile(normal.log, 'utf8'), /exec prettier --check/)
@@ -118,8 +120,8 @@ test('runs selected static checks normally and observes a missing command spawn 
   const missing = await fixture({ command: 'missing' })
   cleanup(() => rm(missing.directory, { recursive: true, force: true }))
   const missingChild = launch(missing)
-  const missingOutput = await outputOf(missingChild)
-  const missingResult = await collectExit(missingChild, missingOutput)
+  const missingOutput = outputOf(missingChild)
+  const missingResult = await missingOutput
   assert.equal(missingResult.code, 1, missingResult.text)
   assert.match(missingResult.text, /spawn failed: spawn pnpm ENOENT/)
   assert.doesNotMatch(missingResult.text, /UnhandledPromiseRejection|unhandledRejection/)
@@ -131,11 +133,11 @@ test('TERM-resistant descendants receive KILL, are reaped, and block later selec
   const f = await fixture({ command: 'hang' })
   cleanup(() => rm(f.directory, { recursive: true, force: true }))
   const child = launch(f)
-  const output = await outputOf(child)
+  const output = outputOf(child)
   await waitForFile(f.ready)
   const descendantPid = Number(await readFile(f.ready, 'utf8'))
   child.kill('SIGTERM')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /fail format \(exit killed\)/)
   assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
@@ -149,13 +151,13 @@ test('a second signal escalates immediately while the first signal determines th
   const f = await fixture({ command: 'hang', hook: 'record-term' })
   cleanup(() => rm(f.directory, { recursive: true, force: true }))
   const child = launch(f)
-  const output = await outputOf(child)
+  const output = outputOf(child)
   await waitForFile(f.ready)
   const descendantPid = Number(await readFile(f.ready, 'utf8'))
   child.kill('SIGTERM')
   await waitForFile(f.termSent)
   child.kill('SIGINT')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.equal(await isAlive(descendantPid), false)
   assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
@@ -165,10 +167,10 @@ test('reports failed final reap and retains the first signal result', async ({ c
   const f = await fixture({ command: 'hang', hook: 'fail-reap' })
   cleanup(() => rm(f.directory, { recursive: true, force: true }))
   const child = launch(f)
-  const output = await outputOf(child)
+  const output = outputOf(child)
   await waitForFile(f.ready)
   child.kill('SIGTERM')
-  const result = await collectExit(child, output)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /cleanup failed:.*did not exit after SIGKILL/s)
   assert.doesNotMatch(await readFile(f.log, 'utf8'), /pnpm lint|pnpm typecheck/)
@@ -202,11 +204,26 @@ require('node:module').syncBuiltinESMExports()
   )
   f.env.NODE_OPTIONS = `${f.env.NODE_OPTIONS ?? ''} --require=${hook}`
   const child = launch(f)
-  const output = await outputOf(child)
-  const result = await collectExit(child, output)
+  const output = outputOf(child)
+  const result = await output
   assert.equal(result.code, 143, result.text)
   assert.match(result.text, /did not exit after SIGKILL/)
   assert.match(result.text, /partial output/)
   assert.match(result.text, /LOCAL_HANDLE_RELEASED/)
   assert.equal(await readFile(f.log, 'utf8'), '')
 }).timeout(10_000)
+
+test('exit collector registers before exit and includes output drained before close', async () => {
+  const stdout = new PassThrough()
+  const stderr = new PassThrough()
+  const child = Object.assign(new EventEmitter(), {
+    stdout,
+    stderr,
+  }) as unknown as ChildProcess
+  const result = outputOf(child)
+  child.emit('exit', 0, null)
+  stdout.write('last stdout')
+  stderr.write(' and stderr')
+  child.emit('close', 0, null)
+  assert.deepEqual(await result, { code: 0, signal: null, text: 'last stdout and stderr' })
+})
