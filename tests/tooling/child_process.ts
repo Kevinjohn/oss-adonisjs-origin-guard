@@ -30,13 +30,31 @@ export async function isAlive(pid: number): Promise<boolean> {
   }
 }
 
-/** Poll for a file a child writes, such as a pid file. */
+/** Wait for a complete positive PID, never treating an empty file as process group zero. */
+export async function waitForPid(filePath: string, timeoutMs = 5000): Promise<number> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const content = await readFile(filePath, 'utf8')
+      const value = content.trim()
+      if (/^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value))) return Number(value)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+  throw new Error(`Timed out waiting for ${filePath}`)
+}
+
+/** Poll for a marker file written by a child. */
 export async function waitForFile(filePath: string, timeoutMs = 5000): Promise<string> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
       return await readFile(filePath, 'utf8')
-    } catch {}
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
   throw new Error(`Timed out waiting for ${filePath}`)
