@@ -113,6 +113,9 @@ application still needs network rules that control who can supply forwarded head
 
 ## Development
 
+Contributors use Node 24, selected by the repository's development tooling. The published package
+supports Node 24 and later.
+
 ```sh
 pnpm install
 pnpm format:check
