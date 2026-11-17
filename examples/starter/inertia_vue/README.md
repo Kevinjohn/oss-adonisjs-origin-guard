@@ -1,6 +1,6 @@
 # Public origin at startup
 
-This AdonisJS starter reads `APP_URL` in `config/app.ts` and validates it with Origin Guard when the app boots. Give it the public origin visitors use, such as `https://app.example.com`. HTTP on loopback works for local development. A path, query string, or insecure production origin stops startup.
+This AdonisJS starter reads `APP_URL` in `config/public_origin.ts` and validates it with Origin Guard when the app boots. Give it the public origin visitors use, such as `https://app.example.com`. HTTP on loopback works for local development. A path, query string, or insecure production origin stops startup.
 
 From this example directory, use Node 24 and pnpm 11.23.0:
 

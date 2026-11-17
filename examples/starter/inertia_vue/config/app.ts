@@ -1,9 +1,5 @@
-import env from '#start/env'
-import { resolvePublicOrigin } from '@kevinjohn/adonisjs-origin-guard'
 import app from '@adonisjs/core/services/app'
 import { defineConfig } from '@adonisjs/core/http'
-
-export const appUrl = resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin
 
 /**
  * The configuration settings used by the HTTP server
