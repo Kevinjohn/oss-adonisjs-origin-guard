@@ -1,3 +1,3 @@
 import { configPkg } from '@adonisjs/eslint-config'
 
-export default configPkg({ ignores: ['build/**', 'tmp/**'] })
+export default configPkg({ ignores: ['build/**', 'tmp/**', 'examples/starter/**'] })

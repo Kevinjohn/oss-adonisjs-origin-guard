@@ -1,0 +1,44 @@
+name: starter examples
+
+on:
+  pull_request:
+    paths:
+      - 'examples/**'
+      - '.github/workflows/starter-examples.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'examples/**'
+      - '.github/workflows/starter-examples.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-origin:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        kit: [api, hypermedia, inertia_react, inertia_vue]
+    defaults:
+      run:
+        working-directory: examples/starter/${{ matrix.kit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: examples/starter/${{ matrix.kit }}/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - run: node ace generate:key --force
+      - run: node ace codegen
+      - run: node ace migration:run --force
+      - run: pnpm typecheck
+      - run: node --test ../../public_origin.test.mjs

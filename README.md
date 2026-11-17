@@ -111,6 +111,10 @@ use it when your network prevents untrusted clients from reaching the app throug
 address. If only specific proxies are trusted, provide a predicate for those peers instead. The
 application still needs network rules that control who can supply forwarded headers.
 
+## Starter examples
+
+Boot a starter with a validated public origin. Each app checks `APP_URL` in its AdonisJS configuration before serving requests. Follow the setup in [API](examples/starter/api/README.md), [Hypermedia](examples/starter/hypermedia/README.md), [Inertia React](examples/starter/inertia_react/README.md), or [Inertia Vue](examples/starter/inertia_vue/README.md).
+
 ## Development
 
 Contributors use Node 24, selected by the repository's development tooling. The published package
