@@ -23,3 +23,6 @@ docs/maintainers/reviews/
 docs/reference/api
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+# Each standalone starter regenerates its own AdonisJS registry.
+/examples/starter/*/.adonisjs/
