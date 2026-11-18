@@ -150,7 +150,7 @@ function launch(f: Fixture): ChildProcess {
 
 function assertOnlyFormatCommand(log: string): void {
   assert.deepEqual(log.trimEnd().split('\n'), [
-    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern -- src-trigger.ts worker.js',
   ])
 }
 
@@ -158,7 +158,7 @@ test('command log assertions reject later lint and typecheck invocations', () =>
   for (const command of ['lint', 'typecheck']) {
     assert.throws(() =>
       assertOnlyFormatCommand(
-        `exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js\n${command}\n`
+        `exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern -- src-trigger.ts worker.js\n${command}\n`
       )
     )
   }
@@ -412,7 +412,7 @@ test('fixture ignores hostile inherited Git configuration and Node preloads', as
   assert.equal(result.code, 0, result.text)
   const log = await readFile(f.log, 'utf8')
   assert.deepEqual(log.trimEnd().split('\n'), [
-    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern src-trigger.ts worker.js',
+    'exec prettier --check --ignore-unknown --no-error-on-unmatched-pattern -- src-trigger.ts worker.js',
     'lint',
     'typecheck',
   ])

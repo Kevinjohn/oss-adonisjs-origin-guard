@@ -1,4 +1,8 @@
-import { readFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from '@japa/runner'
 import {
   executedTests,
@@ -87,6 +91,30 @@ test('formats only existing files and leaves the lockfile to pnpm', ({ assert })
     'pnpm',
     'format:check',
   ])
+})
+
+test('formats changed root filenames that start with a dash as literal paths', async ({
+  assert,
+  cleanup,
+}) => {
+  const root = await mkdtemp(join(tmpdir(), 'origin-guard-changed-format-'))
+  cleanup(() => rm(root, { recursive: true, force: true }))
+  await writeFile(join(root, '-leading.ts'), 'const value={bad:true}\n')
+  await writeFile(join(root, 'ordinary.ts'), 'const value = { ordinary: true };\n')
+
+  const format = ran(planChangedChecks(changed('-leading.ts', 'ordinary.ts'))).format
+  const prettier = fileURLToPath(
+    new URL('../../node_modules/prettier/bin/prettier.cjs', import.meta.url)
+  )
+  const { status, stderr } = spawnSync(process.execPath, [prettier, ...format.slice(3)], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  assert.equal(status, 1, stderr)
+  assert.match(stderr, /\[warn\] -leading\.ts/)
+  assert.notMatch(stderr, /\[warn\] ordinary\.ts/)
+  assert.deepEqual(format.slice(-3), ['--', '-leading.ts', 'ordinary.ts'])
 })
 
 test('formatter configuration checks the whole tree', ({ assert }) => {
