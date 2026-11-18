@@ -461,6 +461,84 @@ require('node:module').syncBuiltinESMExports()
   }).timeout(10_000)
 }
 
+for (const groupExits of [true, false]) {
+  test(`timeout waits for group cleanup after the child closes (group exits: ${groupExits})`, async ({
+    cleanup,
+  }) => {
+    const f = await fixture()
+    cleanup(() => cleanupFixture(f))
+    const hook = path.join(f.directory, 'timeout-close-hook.cjs')
+    await writeFile(
+      hook,
+      `
+const cp = require('node:child_process')
+const { EventEmitter } = require('node:events')
+const { PassThrough } = require('node:stream')
+const originalTimeout = global.setTimeout
+const originalInterval = global.setInterval
+const originalSpawn = cp.spawn
+const now = Date.now
+let child
+let groupChecked = false
+let timeoutArmed = false
+global.setTimeout = (callback, ms, ...args) => {
+  if (ms === 900000 && !timeoutArmed) {
+    timeoutArmed = true
+    return originalTimeout(callback, 0, ...args)
+  }
+  return originalTimeout(callback, ms, ...args)
+}
+global.setInterval = (callback, ms, ...args) => ms === 40
+  ? originalInterval(() => {
+      Date.now = () => now() + 6000
+      try { callback() } finally { Date.now = now }
+    }, ms, ...args)
+  : originalInterval(callback, ms, ...args)
+cp.spawn = (...args) => {
+  if (child) {
+    console.log(groupChecked ? 'LATER_STEP_AFTER_PROBE' : 'LATER_STEP_BEFORE_PROBE')
+    return originalSpawn(...args)
+  }
+  child = new EventEmitter()
+  child.pid = 99999999
+  child.stdout = new PassThrough()
+  child.stderr = new PassThrough()
+  child.unref = () => {}
+  return child
+}
+process.kill = (_pid, signal) => {
+  if (signal === 'SIGKILL') { child.emit('close', null, 'SIGKILL'); return true }
+  if (signal === 0) {
+    groupChecked = true
+    console.log('GROUP_CHECKED')
+    if (!${groupExits}) return true
+    const error = new Error('gone'); error.code = 'ESRCH'; throw error
+  }
+  throw new Error('unexpected signal: ' + signal)
+}
+require('node:module').syncBuiltinESMExports()
+`
+    )
+    f.env.NODE_OPTIONS = `--require=${hook}`
+    const result = await outputOf(launch(f))
+    assert.equal(result.code, 1, result.text)
+    assert.match(result.text, /fail format \(exit killed\)/)
+    assert.match(result.text, /GROUP_CHECKED/)
+    assert.doesNotMatch(result.text, /LATER_STEP_BEFORE_PROBE/)
+    if (groupExits) {
+      assert.match(result.text, /GROUP_CHECKED[\s\S]*LATER_STEP_AFTER_PROBE/)
+      assert.match(result.text, /pass lint/)
+    } else {
+      assert.match(
+        result.text,
+        /cleanup failed: The owned process group did not exit after SIGKILL/
+      )
+      assert.doesNotMatch(result.text, /LATER_STEP_AFTER_PROBE/)
+      assert.equal(await readFile(f.log, 'utf8'), '')
+    }
+  }).timeout(10_000)
+}
+
 test('interrupt settles a nonclosing child after successful cleanup', async ({ cleanup }) => {
   const f = await fixture()
   cleanup(() => cleanupFixture(f))

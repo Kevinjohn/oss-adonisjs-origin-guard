@@ -157,7 +157,9 @@ function changedFiles(base: string): ChangedFile[] {
 }
 
 /** Run one step in its own process group so an interrupt can stop descendants too. */
-function run(step: ChangedCheckStep): Promise<{ status: number | null; output: string }> {
+function run(
+  step: ChangedCheckStep
+): Promise<{ status: number | null; output: string; cleanupFailed: boolean }> {
   return new Promise((resolve) => {
     const child = spawn(step.command[0], step.command.slice(1), {
       cwd: root,
@@ -172,7 +174,6 @@ function run(step: ChangedCheckStep): Promise<{ status: number | null; output: s
     child.stderr.on('data', (chunk) => (output += chunk))
     const timer = setTimeout(() => {
       timedOut = true
-      const abandon = abandonActive
       output += `\n[check:changed] stopped after ${stepLimitMs / 60000} minutes\n`
       let signalError: unknown
       try {
@@ -183,24 +184,27 @@ function run(step: ChangedCheckStep): Promise<{ status: number | null; output: s
       }
       void waitForOwnedProcessExit(child, reapGraceMs).then(
         (stopped) =>
-          abandon?.(
+          releaseChild(
             signalError ??
               (stopped
                 ? undefined
                 : new Error('The owned process group did not exit after SIGKILL.'))
           ),
-        (error) => abandon?.(signalError ?? error)
+        (error) => releaseChild(signalError ?? error)
       )
     }, stepLimitMs)
     child.once('error', (error) => {
       spawnError = error
     })
     let settled = false
-    abandonActive = (error) => {
+    const releaseChild = (error?: unknown) => {
       child.stdout.destroy()
       child.stderr.destroy()
       child.unref()
       void finish(null, null, error)
+    }
+    abandonActive = (error) => {
+      if (!timedOut) releaseChild(error)
     }
     const finish = async (
       status: number | null,
@@ -215,7 +219,7 @@ function run(step: ChangedCheckStep): Promise<{ status: number | null; output: s
         try {
           await interruptionCleanup
         } catch (error) {
-          cleanupError = error
+          cleanupError ??= error
         }
       }
       if (active === child) active = undefined
@@ -224,9 +228,16 @@ function run(step: ChangedCheckStep): Promise<{ status: number | null; output: s
       if (cleanupError !== undefined) {
         output += `\n[check:changed] cleanup failed: ${describeError(cleanupError)}\n`
       }
-      resolve({ status: timedOut || signal ? null : status, output })
+      resolve({
+        status: timedOut || signal ? null : status,
+        output,
+        cleanupFailed: cleanupError !== undefined,
+      })
     }
-    child.once('close', (status, signal) => void finish(status, signal))
+    child.once('close', (status, signal) => {
+      // A timed-out child can close while descendants in its process group are still running.
+      if (!timedOut) void finish(status, signal)
+    })
   })
 }
 
@@ -252,7 +263,7 @@ for (const step of planChangedChecks(changes, { static: flags.includes('--static
     console.log(`skip ${step.label} (${step.skip})`)
     continue
   }
-  const { status, output } = await run(step)
+  const { status, output, cleanupFailed } = await run(step)
   const tests = step.countsTests ? executedTests(output) : undefined
   const problem =
     status !== 0
@@ -266,6 +277,7 @@ for (const step of planChangedChecks(changes, { static: flags.includes('--static
     failed = true
     console.log(`fail ${step.label} (${problem}): ${step.command.join(' ')}`)
     console.log(output.trimEnd().split('\n').slice(-40).join('\n'))
+    if (cleanupFailed) break
   } else {
     console.log(`pass ${step.label}${tests === undefined ? '' : ` (${tests} tests)`}`)
   }
