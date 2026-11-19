@@ -13,7 +13,8 @@ type Cleanup = (handler: () => void | Promise<void>) => void
 
 async function fixture(
   hashResult: 'missing' | 'failing' | 'malformed' | 'valid',
-  cleanup: Cleanup
+  cleanup: Cleanup,
+  smokeExit = 0
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-release-check-'))
   cleanup(() => rm(directory, { recursive: true, force: true }))
@@ -22,6 +23,10 @@ async function fixture(
   await mkdir(path.join(root, 'bin'), { recursive: true })
   await mkdir(bin)
   await writeFile(path.join(root, 'bin/release_check.sh'), await readFile(releaseScript))
+  await writeFile(
+    path.join(root, 'bin/smoke_packed_package.sh'),
+    `#!/bin/bash\nset -e\ntest "$1" = tmp/release/package.tgz\ntest -f "$1"\necho 'smoke checked packed candidate'\nexit ${smokeExit}\n`
+  )
   await writeFile(path.join(root, 'package.json'), '{"type":"module","version":"0.1.0"}\n')
   await writeFile(
     path.join(root, 'CHANGELOG.md'),
@@ -111,10 +116,25 @@ test('release check writes the verified 64-character digest on success', async (
   const result = await runRelease(f)
 
   assert.equal(result.code, 0, result.text)
+  assert.include(result.text, 'smoke checked packed candidate')
   assert.match(result.text, /ready: v0\.1\.0/)
   assert.include(
     await readFile(path.join(f.root, 'tmp/release/notes.md'), 'utf8'),
     `SHA-256: \`${digest}\``
   )
   assert.equal(await readFile(f.outputFile, 'utf8'), 'version=0.1.0\ntarball=package.tgz\n')
+}).timeout(30_000)
+
+test('release check stops before notes and output if the packed candidate fails its smoke check', async ({
+  assert,
+  cleanup,
+}) => {
+  const f = await fixture('valid', cleanup, 17)
+  const result = await runRelease(f)
+
+  assert.include(result.text, 'smoke checked packed candidate')
+  assert.equal(result.code, 17, result.text)
+  assert.notInclude(result.text, 'ready: v')
+  assert.equal(await readFile(f.outputFile, 'utf8'), '')
+  await assert.rejects(() => readFile(path.join(f.root, 'tmp/release/notes.md')), /ENOENT/)
 }).timeout(30_000)
