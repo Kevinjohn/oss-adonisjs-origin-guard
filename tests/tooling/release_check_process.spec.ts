@@ -22,6 +22,10 @@ async function fixture(
   await mkdir(path.join(root, 'bin'), { recursive: true })
   await mkdir(bin)
   await writeFile(path.join(root, 'bin/release_check.sh'), await readFile(releaseScript))
+  await writeFile(
+    path.join(root, 'bin/smoke_packed_package.sh'),
+    '#!/bin/bash\ntest "$1" = tmp/release/package.tgz && test -f "$1"\n'
+  )
   await writeFile(path.join(root, 'package.json'), '{"type":"module","version":"0.1.0"}\n')
   await writeFile(
     path.join(root, 'CHANGELOG.md'),
