@@ -17,6 +17,7 @@ pnpm build
 rm -rf tmp/release && mkdir -p tmp/release
 pnpm pack --pack-destination tmp/release >/dev/null
 TARBALL=$(ls tmp/release/*.tgz)
+bash bin/smoke_packed_package.sh "$TARBALL"
 DIGEST=$(shasum -a 256 "$TARBALL" | cut -d' ' -f1)
 if [[ ! "$DIGEST" =~ ^[[:xdigit:]]{64}$ ]]; then
   echo "Could not calculate a valid SHA-256 digest for $TARBALL" >&2
