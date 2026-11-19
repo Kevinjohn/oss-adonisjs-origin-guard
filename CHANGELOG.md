@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-11-19
+
+- Verify the packed release in a consumer before writing release outputs.
+- Pass changed filenames literally to the formatter and reap timed-out check process groups.
+
 ## 0.2.0 - 2026-11-16
 
 - Document eager HTTP startup validation, the required host environment setting, normalized origin
