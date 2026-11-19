@@ -45,9 +45,9 @@ export function isTrustedUnsafeOrigin(
 export function createOriginGuard(config: OriginGuardConfig) {
   return class OriginGuardMiddleware {
     async handle({ request, response }: HttpContext, next: NextFn) {
-      const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(request.method())
+      const isUnsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(request.method())
       if (
-        unsafe &&
+        isUnsafeMethod &&
         !isTrustedUnsafeOrigin(
           { origin: request.header('origin'), fetchSite: request.header('sec-fetch-site') },
           config

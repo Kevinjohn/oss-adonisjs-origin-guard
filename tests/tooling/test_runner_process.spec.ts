@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { outputOf } from './child_process.js'
+import { captureChildOutput } from './child_process.js'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -17,14 +17,14 @@ async function runSelection(
   const file = path.join(directory, 'selection.spec.ts')
   if (body) await writeFile(file, body)
   const relativeFile = path.relative(repoRoot, file)
-  const env = { ...process.env }
-  delete env.NODE_OPTIONS
+  const environment = { ...process.env }
+  delete environment.NODE_OPTIONS
   const child = spawn(
     process.execPath,
     ['--import=@poppinss/ts-exec', '--enable-source-maps', runnerPath, `--files=${relativeFile}`],
-    { cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'] }
+    { cwd: repoRoot, env: environment, stdio: ['ignore', 'pipe', 'pipe'] }
   )
-  const result = outputOf(child)
+  const result = captureChildOutput(child)
   return result
 }
 

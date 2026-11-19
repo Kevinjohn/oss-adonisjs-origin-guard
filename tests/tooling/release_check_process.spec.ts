@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { outputOf } from './child_process.js'
+import { captureChildOutput } from './child_process.js'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -11,7 +11,7 @@ const releaseScript = path.join(repoRoot, 'bin/release_check.sh')
 const digest = 'a'.repeat(64)
 type Cleanup = (handler: () => void | Promise<void>) => void
 
-async function fixture(
+async function makeReleaseFixture(
   hashResult: 'missing' | 'failing' | 'malformed' | 'valid',
   cleanup: Cleanup
 ) {
@@ -27,8 +27,8 @@ async function fixture(
     path.join(root, 'CHANGELOG.md'),
     '## Unreleased\n\n## 0.1.0 - 2026-11-16\n\nRelease notes.\n'
   )
-  const gitEnv = { ...process.env }
-  for (const key of Object.keys(gitEnv)) {
+  const gitEnvironment = { ...process.env }
+  for (const key of Object.keys(gitEnvironment)) {
     if (
       key === 'GIT_CONFIG_GLOBAL' ||
       key === 'GIT_CONFIG_SYSTEM' ||
@@ -41,21 +41,22 @@ async function fixture(
       key === 'GIT_PREFIX' ||
       /^GIT_CONFIG_(KEY|VALUE)_\d+$/.test(key)
     )
-      delete gitEnv[key]
+      delete gitEnvironment[key]
   }
-  const git = (args: string[]) => execFileSync('git', args, { cwd: root, env: gitEnv })
-  git(['init', '-q'])
-  git(['config', 'user.email', 'fixture@example.test'])
-  git(['config', 'user.name', 'Fixture'])
-  git(['config', 'commit.gpgsign', 'false'])
-  git(['config', 'core.hooksPath', process.platform === 'win32' ? 'NUL' : '/dev/null'])
-  git(['remote', 'add', 'origin', 'https://github.com/example/repo.git'])
-  git(['add', '.'])
-  git(['commit', '-qm', 'fixture release baseline'])
+  const runGit = (commandArguments: string[]) =>
+    execFileSync('git', commandArguments, { cwd: root, env: gitEnvironment })
+  runGit(['init', '-q'])
+  runGit(['config', 'user.email', 'fixture@example.test'])
+  runGit(['config', 'user.name', 'Fixture'])
+  runGit(['config', 'commit.gpgsign', 'false'])
+  runGit(['config', 'core.hooksPath', process.platform === 'win32' ? 'NUL' : '/dev/null'])
+  runGit(['remote', 'add', 'origin', 'https://github.com/example/repo.git'])
+  runGit(['add', '.'])
+  runGit(['commit', '-qm', 'fixture release baseline'])
 
   await writeFile(
     path.join(bin, 'pnpm'),
-    `#!${process.execPath}\nimport { mkdir, writeFile } from 'node:fs/promises'\nconst args = process.argv.slice(2)\nif (args[0] === 'build') process.exit(0)\nif (args[0] === 'pack') { await mkdir('tmp/release', { recursive: true }); await writeFile('tmp/release/package.tgz', 'fixture archive'); process.exit(0) }\nprocess.exit(2)\n`,
+    `#!${process.execPath}\nimport { mkdir, writeFile } from 'node:fs/promises'\nconst commandArguments = process.argv.slice(2)\nif (commandArguments[0] === 'build') process.exit(0)\nif (commandArguments[0] === 'pack') { await mkdir('tmp/release', { recursive: true }); await writeFile('tmp/release/package.tgz', 'fixture archive'); process.exit(0) }\nprocess.exit(2)\n`,
     { mode: 0o755 }
   )
   const hashOutput =
@@ -69,22 +70,22 @@ async function fixture(
   await writeFile(path.join(bin, 'shasum'), `#!/bin/bash\n${hashOutput}\n`, { mode: 0o755 })
   const outputFile = path.join(directory, 'github-output')
   await writeFile(outputFile, '')
-  const env: NodeJS.ProcessEnv = {
+  const environment: NodeJS.ProcessEnv = {
     ...process.env,
     PATH: `${bin}${path.delimiter}${path.dirname(process.execPath)}:/usr/bin:/bin`,
     GITHUB_OUTPUT: outputFile,
   }
-  delete env.NODE_OPTIONS
-  return { directory, root, outputFile, env }
+  delete environment.NODE_OPTIONS
+  return { directory, root, outputFile, environment }
 }
 
-async function runRelease(f: Awaited<ReturnType<typeof fixture>>) {
+async function runReleaseCheck(fixture: Awaited<ReturnType<typeof makeReleaseFixture>>) {
   const child = spawn('/bin/bash', ['bin/release_check.sh'], {
-    cwd: f.root,
-    env: f.env,
+    cwd: fixture.root,
+    env: fixture.environment,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  const result = outputOf(child)
+  const result = captureChildOutput(child)
   return result
 }
 
@@ -93,13 +94,13 @@ test('release check fails before notes and output for missing, failing, or malfo
   cleanup,
 }) => {
   for (const kind of ['missing', 'failing', 'malformed'] as const) {
-    const f = await fixture(kind, cleanup)
-    const result = await runRelease(f)
+    const fixture = await makeReleaseFixture(kind, cleanup)
+    const result = await runReleaseCheck(fixture)
 
     assert.notEqual(result.code, 0, `${kind}: ${result.text}`)
     assert.equal(/ready: v/.test(result.text), false)
-    assert.equal(await readFile(f.outputFile, 'utf8'), '')
-    await assert.rejects(() => readFile(path.join(f.root, 'tmp/release/notes.md')))
+    assert.equal(await readFile(fixture.outputFile, 'utf8'), '')
+    await assert.rejects(() => readFile(path.join(fixture.root, 'tmp/release/notes.md')))
   }
 }).timeout(30_000)
 
@@ -107,14 +108,14 @@ test('release check writes the verified 64-character digest on success', async (
   assert,
   cleanup,
 }) => {
-  const f = await fixture('valid', cleanup)
-  const result = await runRelease(f)
+  const fixture = await makeReleaseFixture('valid', cleanup)
+  const result = await runReleaseCheck(fixture)
 
   assert.equal(result.code, 0, result.text)
   assert.match(result.text, /ready: v0\.1\.0/)
   assert.include(
-    await readFile(path.join(f.root, 'tmp/release/notes.md'), 'utf8'),
+    await readFile(path.join(fixture.root, 'tmp/release/notes.md'), 'utf8'),
     `SHA-256: \`${digest}\``
   )
-  assert.equal(await readFile(f.outputFile, 'utf8'), 'version=0.1.0\ntarball=package.tgz\n')
+  assert.equal(await readFile(fixture.outputFile, 'utf8'), 'version=0.1.0\ntarball=package.tgz\n')
 }).timeout(30_000)

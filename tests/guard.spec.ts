@@ -64,7 +64,7 @@ const cases: { name: string; headers: Record<string, string>; trusted: boolean }
   },
 ]
 
-function context(method: string, headers: Record<string, string>) {
+function makeRequestContext(method: string, headers: Record<string, string>) {
   const req = new IncomingMessage(new Socket())
   req.method = method
   req.url = '/heroes'
@@ -101,7 +101,7 @@ test.group('createOriginGuard', () => {
   test('POST {name}')
     .with(cases)
     .run(async ({ assert }, { headers, trusted }) => {
-      const ctx = context('POST', headers)
+      const ctx = makeRequestContext('POST', headers)
       let reached = false
       await new Guard().handle(ctx, async () => {
         reached = true
@@ -109,7 +109,9 @@ test.group('createOriginGuard', () => {
       assert.equal(reached, trusted)
       if (!trusted) {
         assert.equal(ctx.response.getStatus(), 403)
-        assert.deepEqual(ctx.response.getBody(), { error: 'Cross-site request rejected.' })
+        assert.deepEqual(ctx.response.getBody(), {
+          error: 'Cross-site request rejected.',
+        })
       }
     })
 
@@ -117,16 +119,19 @@ test.group('createOriginGuard', () => {
     .with(['GET', 'HEAD', 'OPTIONS'])
     .run(async ({ assert }, method) => {
       let reached = false
-      await new Guard().handle(context(method, { origin: 'https://lexcorp.example' }), async () => {
-        reached = true
-      })
+      await new Guard().handle(
+        makeRequestContext(method, { origin: 'https://lexcorp.example' }),
+        async () => {
+          reached = true
+        }
+      )
       assert.isTrue(reached)
     })
 
   test('guards {$self}')
     .with(['PUT', 'PATCH', 'DELETE'])
     .run(async ({ assert }, method) => {
-      const ctx = context(method, { origin: 'https://lexcorp.example' })
+      const ctx = makeRequestContext(method, { origin: 'https://lexcorp.example' })
       let reached = false
       await new Guard().handle(ctx, async () => {
         reached = true

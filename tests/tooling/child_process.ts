@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 
 /** Collect a child's stdout and stderr as it runs. */
-export function outputOf(
+export function captureChildOutput(
   child: ChildProcess
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null; text: string }> {
   let output = ''
