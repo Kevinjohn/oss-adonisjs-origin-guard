@@ -6,7 +6,7 @@ const fixtureRoot = new URL('./fixture/', import.meta.url)
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url))
 const bootstrap = `
   import { createServer } from 'node:http'
-  import { Ignitor } from '@adonisjs/core/ignitor'
+  import { Ignitor } from '@adonisjs/core'
   const appRoot = new URL(${JSON.stringify(fixtureRoot.href)})
   const kernel = new URL('./start/kernel.ts', appRoot)
   const serverProvider = new URL('./start/server_provider.ts', appRoot)
