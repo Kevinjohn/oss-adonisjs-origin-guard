@@ -19,6 +19,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 import {
   createOriginGuard,
+  createOriginCheck,
   isPrivatePeer,
   isTrustedUnsafeOrigin,
   parseOrigins,
@@ -27,12 +28,23 @@ import {
   type PublicOrigin,
   type UnsafeRequestHeaders,
 } from '@kevinjohn/adonisjs-origin-guard'
+import type {
+  OriginGuardConfig as SubpathConfig,
+  PublicOrigin as SubpathOrigin,
+  UnsafeRequestHeaders as SubpathHeaders,
+} from '@kevinjohn/adonisjs-origin-guard/types'
 
 const publicOrigin: PublicOrigin = resolvePublicOrigin('https://app.example', 'production', 'APP_URL')
 assert.deepEqual(publicOrigin, { origin: 'https://app.example', secure: true })
 
 const config: OriginGuardConfig = { publicOrigin: publicOrigin.origin }
 const headers: UnsafeRequestHeaders = { origin: publicOrigin.origin }
+const sameConfig: SubpathConfig = config
+const sameOrigin: SubpathOrigin = publicOrigin
+const sameHeaders: SubpathHeaders = headers
+assert.equal(createOriginCheck, createOriginGuard)
+assert.equal(isTrustedUnsafeOrigin(sameHeaders, sameConfig), true)
+assert.equal(sameOrigin.origin, publicOrigin.origin)
 assert.equal(typeof parseOrigins, 'function')
 assert.equal(typeof isPrivatePeer, 'function')
 assert.equal(isTrustedUnsafeOrigin(headers, config), true)

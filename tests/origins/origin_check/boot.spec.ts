@@ -44,6 +44,7 @@ const bootstrap = `
         'GUARD_RESULTS',
         JSON.stringify({
           refused: refused.status,
+          refusedBody: await refused.json(),
           accepted: accepted.status,
           acceptedBody: await accepted.text(),
         })
@@ -98,7 +99,7 @@ test.group('eager origin validation during Adonis startup', () => {
     assert.include(result.stdout, 'HTTP_START_REACHED')
     assert.include(
       result.stdout,
-      'GUARD_RESULTS {"refused":403,"accepted":200,"acceptedBody":"guard reached"}'
+      'GUARD_RESULTS {"refused":403,"refusedBody":{"error":"Cross-site request rejected."},"accepted":200,"acceptedBody":"guard reached"}'
     )
   })
 })

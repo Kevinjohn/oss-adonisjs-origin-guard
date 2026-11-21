@@ -9,7 +9,8 @@ Origin handling for an AdonisJS 7 application behind a browser:
 
 Requires Node 24 or later and `@adonisjs/core` 7. The package reads no environment variable; the
 host passes every value in. The host must declare `APP_URL` in `start/env.ts`, for example as
-`APP_URL: Env.schema.string()`, before reading it from `#start/env`.
+`APP_URL: Env.schema.string()`, and optionally `CORS_ORIGINS: Env.schema.string.optional()`,
+before reading them from `#start/env`.
 
 ## Install
 
@@ -19,7 +20,11 @@ Releases are GitHub release tarballs; the package is not on the npm registry.
 pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.2.1/kevinjohn-adonisjs-origin-guard-0.2.1.tgz
 ```
 
-There is no provider and nothing to configure with `node ace configure`.
+Manual middleware registration is the package convention; there is no provider or Ace configure hook.
+All host trust settings remain host-owned. Invalid settings fail startup with the setting name or
+entry position, not the rejected value. The parsing functions remain usable without middleware
+registration. On the development branch (next release), public types are also available from
+`@kevinjohn/adonisjs-origin-guard/types`.
 
 ## Refuse cross-site writes
 
@@ -30,7 +35,7 @@ Validate the host settings in a module shared by the eagerly loaded kernel and t
 import env from '#start/env'
 import { parseOrigins, resolvePublicOrigin } from '@kevinjohn/adonisjs-origin-guard'
 
-export const originGuardConfig = {
+export const originCheckConfig = {
   publicOrigin: resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin,
   allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
 }
@@ -42,11 +47,11 @@ before the HTTP server begins handling requests. Keep the middleware import lazy
 the already evaluated configuration:
 
 ```ts
-// app/middleware/origin_guard_middleware.ts
+// app/middleware/origin_check_middleware.ts
 import { createOriginGuard } from '@kevinjohn/adonisjs-origin-guard'
-import { originGuardConfig } from '#start/origin_config'
+import { originCheckConfig } from '#start/origin_config'
 
-export default createOriginGuard(originGuardConfig)
+export default createOriginGuard(originCheckConfig)
 ```
 
 Register it as server middleware in `start/kernel.ts`, before anything that acts on a write:
@@ -54,10 +59,10 @@ Register it as server middleware in `start/kernel.ts`, before anything that acts
 ```ts
 import '#start/origin_config'
 
-server.use([() => import('#middleware/origin_guard_middleware')])
+server.use([() => import('#middleware/origin_check_middleware')])
 ```
 
-The guard lets `GET`, `HEAD` and `OPTIONS` through. For every other method:
+The origin-check middleware lets `GET`, `HEAD` and `OPTIONS` through. For every other method:
 
 | Request                                                     | Outcome  |
 | ----------------------------------------------------------- | -------- |
@@ -74,11 +79,14 @@ function.
 
 Pass a `publicOrigin` produced by `resolvePublicOrigin` and `allowedOrigins` produced by
 `parseOrigins` (or an equivalent validated serialized HTTP(S) origin list). Validate host-owned
-settings once during eager startup as shown in the startup example above. The per-request guard compares headers with that
+settings once during eager startup as shown in the startup example above. The per-request origin check compares headers with that
 configuration; it does not parse or revalidate the configured origins on each request.
 
-Turn off Shield's token-based CSRF if this guard replaces it. A client that sends neither header,
+Turn off Shield's token-based CSRF if this middleware replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
+
+On the development branch (next release), `createOriginCheck` is an alias of `createOriginGuard`
+with the same type and behaviour. The example above works with the current release.
 
 ## Parse origins
 
