@@ -11,7 +11,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 ## Acceptance criteria
 
-- The documented release installation targets Node 24+ and AdonisJS core 7. Use `createOriginGuard` for the v0.2.1 example. At this source revision (next release), `createOriginCheck` is the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
+- The documented v0.3.0 release installation targets Node 24+ and AdonisJS core 7. `createOriginGuard` and `createOriginCheck` are the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
 - The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
 - The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener. The operator corrects the reported setting and restarts.
 - With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403 and a trusted origin reaches the handler and receives 200. The host owns registration and the handler's success response.
