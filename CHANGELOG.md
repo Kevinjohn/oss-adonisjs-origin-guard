@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-21
+
+- Document and verify the package user stories and implementation flows.
+
 ## 0.2.1 - 2026-11-19
 
 - Verify the packed release in a consumer before writing release outputs.
