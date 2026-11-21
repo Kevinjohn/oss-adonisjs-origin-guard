@@ -19,6 +19,9 @@ As an application operator, I want a comma-separated list of trusted origins val
 - `*` throws `CORS requires explicit origins when credentials are enabled`.
 - An entry that does not parse as an HTTP(S) URL, or that after WHATWG parsing has credentials, a path other than `/`, a non-empty query or a non-empty fragment, throws `Invalid CORS origin at position <n>: expected a bare HTTP(S) origin`. The rejected value is omitted from diagnostics. The host corrects the setting and restarts.
 - Accepted spellings are returned as `URL.origin`, so host case, default ports and a trailing root slash are normalized by WHATWG URL parsing before validation and return.
+- Unlike the public-origin validator, the list parser has no environment argument and accepts HTTP as well as HTTPS. The host selects which origins it trusts.
+
+The returned array preserves entry order and duplicates. Parsing stops at the first invalid non-blank entry. Its one-based position counts blank fields in the original comma-separated input. The wildcard has its own diagnostic without a position.
 
 ## User flow
 
@@ -37,13 +40,16 @@ Scope: package parsing; passing the result to CORS or `createOriginGuard` is hos
 
 ```mermaid
 flowchart TD
-    A["parseOrigins(list)"] --> B["split on comma, trim, drop blanks"]
-    B --> C{"entry === '*'?"}
+    A["parseOrigins(list)"] --> B["Split, trim and retain original positions; filter blanks"]
+    B --> I{"Next remaining entry?"}
+    I -->|No| J["Return array of origins"]
+    I -->|Yes| C{"origin === '*'?"}
     C -->|Yes| D["throw CORS requires explicit origins"]
-    C -->|No| E["new URL(entry)"]
-    E --> F{"Parses, http or https, no credentials, path '/', no query or fragment?"}
-    F -->|No| G["throw Invalid CORS origin"]
-    F -->|Yes| H["return parsed.origin for each entry"]
+    C -->|No| E["Try new URL(origin); catch parsing failure"]
+    E --> F{"Parsed, http or https, no credentials, path '/', no non-empty query or fragment?"}
+    F -->|No| G["throw Invalid CORS origin at original position"]
+    F -->|Yes| H["Collect parsed.origin"]
+    H --> I
 ```
 
-**Code references:** [parseOrigins](../src/origins.ts#L13).
+**Code references:** [parseOrigins](../src/origins.ts).

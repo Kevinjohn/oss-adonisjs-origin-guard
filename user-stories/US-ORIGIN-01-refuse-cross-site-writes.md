@@ -19,11 +19,11 @@ As an application developer, I want browser writes from untrusted origins refuse
 | `Sec-Fetch-Site` | Request header                     | Decides the result only when `Origin` is absent or empty; only `same-origin` is accepted.                                                                                                     |
 
 - `GET`, `HEAD` and `OPTIONS` pass through without reading either header.
-- Any other method is accepted when `Origin` equals the public origin or an allowed origin exactly, or when `Origin` is absent or empty and `Sec-Fetch-Site` is `same-origin`.
+- A non-empty Origin decides the outcome even when Sec-Fetch-Site disagrees. Any other method is accepted when `Origin` equals the public origin or an allowed origin exactly, or when `Origin` is absent or empty and `Sec-Fetch-Site` is `same-origin`.
 - Every other write, including `Origin: null`, a `same-site` or `cross-site` fetch without `Origin`, and a request with neither header, is refused with `403` and `{ "error": "Cross-site request rejected." }`; the rest of the stack does not run.
-- `Host` and the request protocol are never consulted. A non-browser client that sends neither header must send `Origin`.
+- `Host` and the request protocol are never consulted. A non-browser client without fetch metadata can supply a trusted `Origin`.
 - The host supplies validated configuration at startup. The middleware compares request headers with that configuration and does not revalidate configured origins per request.
-- The host turns off Shield's token-based CSRF if this middleware replaces it; the package does not.
+- The host turns off Shield's token-based CSRF if this middleware replaces it; the package does not. The host must keep GET, HEAD and OPTIONS free of state-changing actions and apply authentication and authorisation separately.
 
 ## User flow
 
@@ -46,9 +46,11 @@ Scope: package middleware decision; registering it, choosing the origins and dis
 
 ```mermaid
 flowchart TD
-    A["OriginGuardMiddleware.handle(ctx, next)"] --> B{"request.method() is GET, HEAD or OPTIONS?"}
+    P["createOriginGuard(config) returns OriginGuardMiddleware"] --> A["OriginGuardMiddleware.handle(ctx, next)"]
+    A --> B{"request.method() is GET, HEAD or OPTIONS?"}
     B -->|Yes| N["return next()"]
-    B -->|No| C["isTrustedUnsafeOrigin({ origin, fetchSite }, config)"]
+    B -->|No| R["Read origin and sec-fetch-site via request.header"]
+    R --> C["isTrustedUnsafeOrigin({ origin, fetchSite }, config)"]
     C --> D{"origin empty or absent?"}
     D -->|Yes| E["return fetchSite === 'same-origin'"]
     D -->|No| F["return origin === publicOrigin or allowedOrigins includes origin"]
@@ -58,4 +60,4 @@ flowchart TD
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/origin_check.ts#L37), [isTrustedUnsafeOrigin](../src/origin_check.ts#L24), [OriginGuardConfig](../src/origin_check.ts#L5).
+**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/origin_check.ts).
