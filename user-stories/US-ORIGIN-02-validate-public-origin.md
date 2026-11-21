@@ -45,9 +45,10 @@ Scope: package validation; reading the setting and using `secure` are host-owned
 
 ```mermaid
 flowchart TD
-    A["resolvePublicOrigin(value, environment, variable)"] --> B["new URL(value)"]
-    B --> C{"Parses, http or https, url.origin === value, no credentials?"}
-    C -->|No| D["throw variable must be a bare HTTP(S) origin"]
+    A["resolvePublicOrigin(value, environment, variable)"] --> B{"new URL(value) succeeds?"}
+    B -->|Throws| D["throw variable must be a bare HTTP(S) origin"]
+    B -->|Yes| C{"http or https, url.origin === value, no credentials?"}
+    C -->|No| D
     C -->|Yes| E{"protocol not https and (production or hostname not loopback)?"}
     E -->|Yes| F["throw production or development/test HTTPS error"]
     E -->|No| G["return { origin, secure }"]

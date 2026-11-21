@@ -11,7 +11,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 ## Acceptance criteria
 
-- The documented release installation targets Node 24+ and AdonisJS core 7. Use `createOriginGuard` for the v0.2.1 example. At this source revision `createOriginCheck` is the same factory. The root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`.
+- The documented release installation targets Node 24+ and AdonisJS core 7. Use `createOriginGuard` for the v0.2.1 example. At this source revision (next release), `createOriginCheck` is the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
 - The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
 - The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener. The operator corrects the reported setting and restarts.
 - With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403 and a trusted origin reaches the handler and receives 200. The host owns registration and the handler's success response.
@@ -21,23 +21,34 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 ```mermaid
 flowchart TD
-    A["Install and configure host"] --> B{"Settings valid at boot?"}
-    B -->|No| C["Correct settings and restart"]
+    A["Install release and wire host middleware"] --> S["Set public URL and optional trusted origins"]
+    S --> B{"Settings valid at boot?"}
+    B -->|No| C["See configuration error; correct settings and restart"]
     C --> B
-    B -->|Yes| D["Serve requests through middleware"]
+    B -->|Yes| D["HTTP listener starts"]
+    D --> E{"Request admitted by origin check?"}
+    E -->|Yes| F["Request reaches remaining stack"]
+    E -->|No| G["Receive 403; handler does not run"]
 ```
 
 ## Code flow
 
+Scope: host startup fixture and package middleware; the host owns registration, listener and route response.
+
 ```mermaid
 flowchart TD
-    A["Web kernel imports shared config"] --> B["resolvePublicOrigin and parseOrigins"]
-    B -->|Throws| C["Boot stops before HTTP starts"]
-    B -->|Returns| D["Register lazy middleware with server.use"]
-    D --> E["Middleware uses evaluated config"]
-    E --> F{"Write origin trusted?"}
-    F -->|Yes| G["Call next"]
-    F -->|No| H["Respond 403"]
+    A["Web kernel imports origin_config"] --> V["Env.create in start/env.ts"]
+    V -->|Throws| C["Boot stops before listener"]
+    V -->|Returns| B["resolvePublicOrigin, then parseOrigins"]
+    B -->|Throws| C
+    B -->|Returns| D["server.use registers lazy middleware"]
+    D --> L["Boot server, start HTTP listener"]
+    L --> E["Middleware module consumes evaluated config via factory"]
+    E --> M{"GET, HEAD or OPTIONS?"}
+    M -->|Yes| G["return next()"]
+    M -->|No| F{"isTrustedUnsafeOrigin?"}
+    F -->|Yes| G
+    F -->|No| H["response.forbidden: 403"]
 ```
 
-**Code references:** [Fixture kernel](../tests/origins/origin_check/fixture/start/kernel.ts), [decision logic](../src/origin_check.ts).
+**Code references:** [Fixture kernel](../tests/origins/origin_check/fixture/start/kernel.ts), [environment schema](../tests/origins/origin_check/fixture/start/env.ts), [shared config](../tests/origins/origin_check/fixture/start/origin_config.ts), [middleware module](../tests/origins/origin_check/fixture/start/middleware.ts), [boot harness](../tests/origins/origin_check/boot.spec.ts), [decision logic](../src/origin_check.ts).
