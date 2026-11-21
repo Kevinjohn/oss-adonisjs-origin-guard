@@ -23,6 +23,8 @@ As an application operator, I want the origin my application is served from chec
 - A value that does not parse, is not HTTP(S), carries credentials or differs from its serialized origin throws `<variable> must be a bare HTTP(S) origin` during HTTP startup. Invalid configuration prevents the app reaching ready state or handling requests.
 - Plain HTTP throws `<variable>: public production origins require HTTPS` in production. In development and test it throws `<variable> must use HTTPS outside loopback in development/test` unless the hostname is `localhost`, `127.0.0.1` or `[::1]`. The host corrects the setting and restarts.
 
+The comparison uses the complete input string. Host case, an explicit default port or a trailing slash that changes on serialisation fails the bare-origin check. A canonical non-default port remains part of the origin.
+
 ## User flow
 
 ```mermaid
@@ -51,4 +53,4 @@ flowchart TD
     E -->|No| G["return { origin, secure }"]
 ```
 
-**Code references:** [resolvePublicOrigin](../src/origins.ts#L53), [PublicOrigin](../src/origins.ts#L2).
+**Code references:** [resolvePublicOrigin](../src/origins.ts), [PublicOrigin](../src/origins.ts).

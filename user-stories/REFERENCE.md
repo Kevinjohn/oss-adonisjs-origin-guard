@@ -12,7 +12,7 @@
 - Origin-check middleware and decision function: [`src/origin_check.ts`](../src/origin_check.ts).
 - Public origin and trusted origin parsing: [`src/origins.ts`](../src/origins.ts).
 - Private-peer check: [`src/private_peer.ts`](../src/private_peer.ts).
-- Contracts and host wiring examples: [README](../README.md). There is no separate guide.
+- Contracts and host wiring examples: [README](../README.md). See also the [executable startup fixture](../tests/origins/origin_check/boot.spec.ts) and [packed consumer check](../bin/smoke_packed_package.sh).
 - Test evidence: [`tests/origin_check.spec.ts`](../tests/origin_check.spec.ts), [`tests/origins.spec.ts`](../tests/origins.spec.ts), [`tests/private_peer.spec.ts`](../tests/private_peer.spec.ts).
 
 ## Availability
@@ -28,4 +28,4 @@
 - **Operator:** installation, configuration or hosting outside ordinary application requests.
 - **Planned:** agreed target without an ordinary implemented journey.
 
-No runtime application journey was exercised for this documentation change. See the [portable template](TEMPLATE.md) for writing and diagram maintenance rules.
+See the [portable template](TEMPLATE.md) for writing and diagram maintenance rules.
