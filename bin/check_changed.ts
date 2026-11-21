@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
-  countExecutedTests,
+  CheckOutput,
   planChangedChecks,
   type ChangedCheckStep,
   type ChangedFile,
@@ -160,7 +160,7 @@ function listChangedFiles(base: string): ChangedFile[] {
 /** Run one step in its own process group so an interrupt can stop descendants too. */
 function runCheckStep(
   step: ChangedCheckStep
-): Promise<{ status: number | null; output: string; cleanupFailed: boolean }> {
+): Promise<{ status: number | null; output: string; testCount: number; cleanupFailed: boolean }> {
   return new Promise((resolve) => {
     const child = spawn(step.command[0], step.command.slice(1), {
       cwd: root,
@@ -168,20 +168,20 @@ function runCheckStep(
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     active = child
-    let output = ''
+    const output = new CheckOutput()
     let spawnError: Error | undefined
     let timedOut = false
-    child.stdout.on('data', (chunk) => (output += chunk))
-    child.stderr.on('data', (chunk) => (output += chunk))
+    child.stdout.setEncoding('utf8').on('data', (chunk) => output.append(chunk, 'stdout'))
+    child.stderr.setEncoding('utf8').on('data', (chunk) => output.append(chunk, 'stderr'))
     const timer = setTimeout(() => {
       timedOut = true
-      output += `\n[check:changed] stopped after ${stepLimitMs / 60000} minutes\n`
+      output.append(`\n[check:changed] stopped after ${stepLimitMs / 60000} minutes\n`)
       let signalError: unknown
       try {
         signalOwnedProcess(child, 'SIGKILL')
       } catch (error) {
         signalError = error
-        output += `[check:changed] timeout cleanup failed: ${describeError(error)}\n`
+        output.append(`[check:changed] timeout cleanup failed: ${describeError(error)}\n`)
       }
       void waitForOwnedProcessExit(child, reapGraceMs).then(
         (stopped) =>
@@ -225,13 +225,13 @@ function runCheckStep(
       }
       if (active === child) active = undefined
       abandonActive = undefined
-      if (spawnError) output += `\n[check:changed] spawn failed: ${spawnError.message}\n`
+      if (spawnError) output.append(`\n[check:changed] spawn failed: ${spawnError.message}\n`)
       if (cleanupError !== undefined) {
-        output += `\n[check:changed] cleanup failed: ${describeError(cleanupError)}\n`
+        output.append(`\n[check:changed] cleanup failed: ${describeError(cleanupError)}\n`)
       }
       resolve({
         status: timedOut || signal ? null : status,
-        output,
+        ...output.finish(),
         cleanupFailed: cleanupError !== undefined,
       })
     }
@@ -264,8 +264,8 @@ for (const step of planChangedChecks(changes, { static: flags.includes('--static
     console.log(`skip ${step.label} (${step.skip})`)
     continue
   }
-  const { status, output, cleanupFailed } = await runCheckStep(step)
-  const tests = step.countsTests ? countExecutedTests(output) : undefined
+  const { status, output, testCount, cleanupFailed } = await runCheckStep(step)
+  const tests = step.countsTests ? testCount : undefined
   const problem =
     status !== 0
       ? `exit ${status ?? 'killed'}`

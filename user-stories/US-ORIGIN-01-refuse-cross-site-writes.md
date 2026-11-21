@@ -4,10 +4,10 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 **Status:** Current.
 **Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack.
-**Entry:** `createOriginGuard({ publicOrigin, allowedOrigins })`, default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
+**Entry:** `createOriginCheck({ publicOrigin, allowedOrigins })`, (also exported as `createOriginGuard`), default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
 **Documentation:** [Refuse cross-site writes](../README.md#refuse-cross-site-writes).
-**Source:** [guard](../src/guard.ts).
-**Coverage:** [Guard tests](../tests/guard.spec.ts).
+**Source:** [origin check](../src/origin_check.ts).
+**Coverage:** [Origin-check tests](../tests/origin_check.spec.ts).
 
 ## Acceptance criteria
 
@@ -23,7 +23,7 @@ As an application developer, I want browser writes from untrusted origins refuse
 - Every other write, including `Origin: null`, a `same-site` or `cross-site` fetch without `Origin`, and a request with neither header, is refused with `403` and `{ "error": "Cross-site request rejected." }`; the rest of the stack does not run.
 - `Host` and the request protocol are never consulted. A non-browser client that sends neither header must send `Origin`.
 - The host supplies validated configuration at startup. The middleware compares request headers with that configuration and does not revalidate configured origins per request.
-- The host turns off Shield's token-based CSRF if this guard replaces it; the package does not.
+- The host turns off Shield's token-based CSRF if this middleware replaces it; the package does not.
 
 ## User flow
 
@@ -58,4 +58,4 @@ flowchart TD
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/guard.ts#L37), [isTrustedUnsafeOrigin](../src/guard.ts#L24), [OriginGuardConfig](../src/guard.ts#L5).
+**Code references:** [createOriginGuard](../src/origin_check.ts#L37), [isTrustedUnsafeOrigin](../src/origin_check.ts#L24), [OriginGuardConfig](../src/origin_check.ts#L5).

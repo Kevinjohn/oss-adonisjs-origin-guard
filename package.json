@@ -21,7 +21,10 @@
   ],
   "main": "./build/index.js",
   "exports": {
-    ".": "./build/index.js"
+    ".": "./build/index.js",
+    "./types": {
+      "types": "./build/types.d.ts"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

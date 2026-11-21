@@ -1,5 +1,6 @@
 import strictAssert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { PassThrough } from 'node:stream'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,10 +9,43 @@ import { stripVTControlCharacters } from 'node:util'
 import { test } from '@japa/runner'
 import {
   countExecutedTests,
+  CheckOutput,
   planChangedChecks,
   type ChangedFile,
   type PlannedCheckStep,
 } from '../../bin/check_changed_plan.js'
+
+test('bounded output retains split test markers independently of the diagnostic tail', ({
+  assert,
+}) => {
+  const output = new CheckOutput()
+  output.append('  Tests  ', 'stdout')
+  output.append('interleaved stderr\n', 'stderr')
+  output.append('12 passed\n', 'stdout')
+  output.append('x'.repeat(512 * 1024), 'stdout')
+  output.append('\nlast diagnostic: café', 'stderr')
+  const result = output.finish()
+  assert.equal(result.testCount, 12)
+  assert.isAtMost(result.output.length, 256 * 1024)
+  assert.notInclude(result.output, 'interleaved stderr')
+  assert.isTrue(result.output.endsWith('last diagnostic: café'))
+})
+
+test('decoded chunks on both streams preserve split UTF-8 and unterminated diagnostic lines', ({
+  assert,
+}) => {
+  const output = new CheckOutput()
+  const stdout = new PassThrough()
+  const stderr = new PassThrough()
+  stdout.setEncoding('utf8').on('data', (chunk) => output.append(chunk, 'stdout'))
+  stderr.setEncoding('utf8').on('data', (chunk) => output.append(chunk, 'stderr'))
+  const text = Buffer.from('café')
+  stdout.write(text.subarray(0, 4))
+  stdout.write(text.subarray(4))
+  stderr.end(' and final error')
+  stdout.end()
+  assert.equal(output.finish().output, 'café and final error')
+})
 
 const packageJson = new URL('../../package.json', import.meta.url)
 const makeChangedPaths = (...paths: string[]): ChangedFile[] =>
@@ -24,7 +58,7 @@ function buildRunnableCommandsByLabel(plan: PlannedCheckStep[]): Record<string, 
 }
 
 test('a changed spec runs on its own and requires executed tests', ({ assert }) => {
-  const plan = planChangedChecks(makeChangedPaths('tests/guard.spec.ts'))
+  const plan = planChangedChecks(makeChangedPaths('tests/origin_check.spec.ts'))
   const tests = plan.find((step) => step.label === 'tests')
 
   assert.deepEqual(Object.keys(buildRunnableCommandsByLabel(plan)), [
@@ -34,16 +68,16 @@ test('a changed spec runs on its own and requires executed tests', ({ assert }) 
     'tests',
   ])
   assert.deepInclude(tests, {
-    command: ['pnpm', 'quick:test', '--files=tests/guard.spec.ts'],
+    command: ['pnpm', 'quick:test', '--files=tests/origin_check.spec.ts'],
     countsTests: true,
     requiresTests: true,
   })
 })
 
 test('package source and manifests run the suite and the build', ({ assert }) => {
-  for (const path of ['src/guard.ts', 'package.json', 'pnpm-lock.yaml']) {
+  for (const path of ['src/origin_check.ts', 'package.json', 'pnpm-lock.yaml']) {
     const commands = buildRunnableCommandsByLabel(
-      planChangedChecks(makeChangedPaths(path, 'tests/guard.spec.ts'))
+      planChangedChecks(makeChangedPaths(path, 'tests/origin_check.spec.ts'))
     )
     assert.deepEqual(commands.tests, ['pnpm', 'quick:test'], path)
     assert.deepEqual(commands.build, ['pnpm', 'build'], path)
@@ -169,9 +203,12 @@ test('lint allows no warnings and skips files ESLint ignores', async ({ assert }
 })
 
 test('--static names each selected suite in a skip line instead of running it', ({ assert }) => {
-  const plan = planChangedChecks(makeChangedPaths('src/guard.ts', 'package.json', 'README.md'), {
-    static: true,
-  })
+  const plan = planChangedChecks(
+    makeChangedPaths('src/origin_check.ts', 'package.json', 'README.md'),
+    {
+      static: true,
+    }
+  )
 
   assert.deepEqual(Object.keys(buildRunnableCommandsByLabel(plan)), ['format', 'lint', 'typecheck'])
   for (const [label, skip] of [
@@ -182,17 +219,20 @@ test('--static names each selected suite in a skip line instead of running it', 
 })
 
 test('--static still runs the changed specs on their own', ({ assert }) => {
-  const plan = planChangedChecks(makeChangedPaths('src/guard.ts', 'tests/guard.spec.ts'), {
-    static: true,
-  })
+  const plan = planChangedChecks(
+    makeChangedPaths('src/origin_check.ts', 'tests/origin_check.spec.ts'),
+    {
+      static: true,
+    }
+  )
 
   assert.deepEqual(buildRunnableCommandsByLabel(plan).tests, [
     'pnpm',
     'quick:test',
-    '--files=tests/guard.spec.ts',
+    '--files=tests/origin_check.spec.ts',
   ])
   assert.deepInclude(plan, { label: 'test suite', skip: '--static leaves out pnpm quick:test' })
-  assert.deepInclude(planChangedChecks(makeChangedPaths('src/guard.ts'), { static: true }), {
+  assert.deepInclude(planChangedChecks(makeChangedPaths('src/origin_check.ts'), { static: true }), {
     label: 'tests',
     skip: 'no test files changed',
   })
@@ -200,8 +240,8 @@ test('--static still runs the changed specs on their own', ({ assert }) => {
 
 test('--static plans a spec-only change exactly as the default does', ({ assert }) => {
   assert.deepEqual(
-    planChangedChecks(makeChangedPaths('tests/guard.spec.ts'), { static: true }),
-    planChangedChecks(makeChangedPaths('tests/guard.spec.ts'))
+    planChangedChecks(makeChangedPaths('tests/origin_check.spec.ts'), { static: true }),
+    planChangedChecks(makeChangedPaths('tests/origin_check.spec.ts'))
   )
 })
 

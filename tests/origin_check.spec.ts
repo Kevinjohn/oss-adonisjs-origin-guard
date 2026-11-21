@@ -96,14 +96,14 @@ test.group('isTrustedUnsafeOrigin', () => {
 })
 
 test.group('createOriginGuard', () => {
-  const Guard = createOriginGuard(config)
+  const OriginCheck = createOriginGuard(config)
 
   test('POST {name}')
     .with(cases)
     .run(async ({ assert }, { headers, trusted }) => {
       const ctx = makeRequestContext('POST', headers)
       let reached = false
-      await new Guard().handle(ctx, async () => {
+      await new OriginCheck().handle(ctx, async () => {
         reached = true
       })
       assert.equal(reached, trusted)
@@ -119,7 +119,7 @@ test.group('createOriginGuard', () => {
     .with(['GET', 'HEAD', 'OPTIONS'])
     .run(async ({ assert }, method) => {
       let reached = false
-      await new Guard().handle(
+      await new OriginCheck().handle(
         makeRequestContext(method, { origin: 'https://lexcorp.example' }),
         async () => {
           reached = true
@@ -128,12 +128,12 @@ test.group('createOriginGuard', () => {
       assert.isTrue(reached)
     })
 
-  test('guards {$self}')
+  test('checks {$self}')
     .with(['PUT', 'PATCH', 'DELETE'])
     .run(async ({ assert }, method) => {
       const ctx = makeRequestContext(method, { origin: 'https://lexcorp.example' })
       let reached = false
-      await new Guard().handle(ctx, async () => {
+      await new OriginCheck().handle(ctx, async () => {
         reached = true
       })
       assert.isFalse(reached)

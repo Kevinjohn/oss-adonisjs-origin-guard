@@ -1,6 +1,6 @@
 # User story catalogue
 
-Source baseline: `c748e5d63dd34385ee441001b07e07bca0749fca` (origin/main, 2026-11-14). Scope: the public exports in `index.ts`: the cross-site write guard and its decision function, public and trusted origin parsing, and the private-peer check. Source-reviewed only; no runtime journeys were exercised for this catalogue.
+Source baseline: `c748e5d63dd34385ee441001b07e07bca0749fca` (origin/main, 2026-11-14). Scope: the public exports in `index.ts`: the cross-site origin check and its decision function, public and trusted origin parsing, and the private-peer check. Source-reviewed only; no runtime journeys were exercised for this catalogue.
 
 ## Index
 

@@ -15,8 +15,8 @@ As a [role], I want to [action] so that [useful outcome].
 **Access:** [Actual roles and relevant conditions]
 **Entry:** [Screen, route and exact visible control, API, or explicitly unavailable]
 **Documentation:** [Relevant guide](../README.md), or state that none exists
-**Source:** [Entry implementation](../src/guard.ts)
-**Coverage:** [Relevant test, optional](../tests/guard.spec.ts)
+**Source:** [Entry implementation](../src/origin_check.ts)
+**Coverage:** [Relevant test, optional](../tests/origin_check.spec.ts)
 
 ## Acceptance criteria
 
@@ -53,7 +53,7 @@ flowchart TD
     D -->|Yes| F["Actual persistence and response"]
 ```
 
-**Code references:** [Entry](../src/guard.ts), [Handler](../src/guard.ts)
+**Code references:** [Entry](../src/origin_check.ts), [Handler](../src/origin_check.ts)
 ````
 
 ## Actions without input fields

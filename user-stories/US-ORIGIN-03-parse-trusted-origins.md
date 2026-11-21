@@ -1,6 +1,6 @@
 # US-ORIGIN-03 — Parse the trusted origin list
 
-As an application operator, I want a comma-separated list of trusted origins validated and normalised when the application starts so that CORS and the write guard trust exactly the origins I meant, never a wildcard.
+As an application operator, I want a comma-separated list of trusted origins validated and normalised when the application starts so that CORS and the origin check trust exactly the origins I meant, never a wildcard.
 
 **Status:** Operator.
 **Access:** Operator who sets the host's trusted-origin setting (for example `CORS_ORIGINS`); host code passes it in.
@@ -28,7 +28,7 @@ flowchart TD
     B --> C{"Any entry is a wildcard or not a bare HTTP(S) origin?"}
     C -->|Yes| D["Boot stops with a parsing error; correct the setting"]
     D --> A
-    C -->|No| E["Application receives the parsed origins for its CORS config or the write guard's allowedOrigins"]
+    C -->|No| E["Application receives the parsed origins for its CORS config or the origin check's allowedOrigins"]
 ```
 
 ## Code flow
