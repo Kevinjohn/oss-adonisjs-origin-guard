@@ -23,7 +23,7 @@ pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/downloa
 Manual middleware registration is the package convention; there is no provider or Ace configure hook.
 All host trust settings remain host-owned. Invalid settings fail startup with the setting name or
 entry position, not the rejected value. The parsing functions remain usable without middleware
-registration. On the development branch (next release), public types are also available from
+registration. Since v0.3.0, public types are also available from
 `@kevinjohn/adonisjs-origin-guard/types`.
 
 ## Refuse cross-site writes
@@ -48,10 +48,10 @@ the already evaluated configuration:
 
 ```ts
 // app/middleware/origin_check_middleware.ts
-import { createOriginGuard } from '@kevinjohn/adonisjs-origin-guard'
+import { createOriginCheck } from '@kevinjohn/adonisjs-origin-guard'
 import { originCheckConfig } from '#start/origin_config'
 
-export default createOriginGuard(originCheckConfig)
+export default createOriginCheck(originCheckConfig)
 ```
 
 Register it as server middleware in `start/kernel.ts`, before anything that acts on a write:
@@ -85,8 +85,7 @@ configuration; it does not parse or revalidate the configured origins on each re
 Turn off Shield's token-based CSRF if this middleware replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
 
-On the development branch (next release), `createOriginCheck` is an alias of `createOriginGuard`
-with the same type and behaviour. The example above works with the current release.
+Since v0.3.0, `createOriginCheck` and `createOriginGuard` are two names for the same factory.
 
 ## Parse origins
 
