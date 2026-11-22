@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.3.1 - 2026-11-22
+
+- Document the shipped `createOriginCheck` alias and the public `/types` entry, and use the alias
+  in the middleware registration example.
+
 ## 0.3.0 - 2026-11-21
 
 - Document and verify the package user stories and implementation flows.
