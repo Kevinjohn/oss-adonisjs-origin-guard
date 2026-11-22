@@ -11,4 +11,4 @@ None was identified between the [README](../README.md), the [changelog](../CHANG
 | Different parser policies       | [origins](../src/origins.ts) validates the public value strictly, but the list parser normalises parsed origins and has no environment check.     | US-ORIGIN-02 and US-ORIGIN-03 distinguish these validation policies.                                                          |
 | Private networks only           | [isPrivatePeer](../src/private_peer.ts) covers loopback, RFC 1918 IPv4 ranges, `::1` and `fc00::/7`; link-local and other ranges are not trusted. | US-ORIGIN-04 leaves deployments with other proxy addresses to a host-written `trustProxy`.                                    |
 
-The [installation story](US-ORIGIN-05-install-and-start.md) describes the v0.3.0 installation example and the exports targeted by the packed consumer check.
+The [installation story](US-ORIGIN-05-install-and-start.md) describes the installation example and the exports targeted by the packed consumer check.
