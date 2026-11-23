@@ -40,7 +40,7 @@ const bootstrap = `
         return { status: response.status, body: await response.text() }
       }
       console.log(
-        'GUARD_RESULTS',
+        'WRITE_RESULTS',
         JSON.stringify({
           foreign: await write('https://evil.example'),
           listed: await write('https://trusted.example'),
@@ -57,7 +57,7 @@ const bootstrap = `
 `
 
 const refusal = { status: 403, body: '{"error":"Cross-site request rejected."}' }
-const reached = { status: 200, body: 'guard reached' }
+const reached = { status: 200, body: 'handler reached' }
 
 function startFixture(appUrl: string, corsOrigins: string | undefined) {
   const result = spawnSync(
@@ -77,8 +77,8 @@ function startFixture(appUrl: string, corsOrigins: string | undefined) {
 }
 
 function writeResults(stdout: string) {
-  const line = stdout.split('\n').find((output) => output.startsWith('GUARD_RESULTS '))
-  return line ? JSON.parse(line.slice('GUARD_RESULTS '.length)) : undefined
+  const line = stdout.split('\n').find((output) => output.startsWith('WRITE_RESULTS '))
+  return line ? JSON.parse(line.slice('WRITE_RESULTS '.length)) : undefined
 }
 
 test.group('eager origin validation during AdonisJS startup', () => {

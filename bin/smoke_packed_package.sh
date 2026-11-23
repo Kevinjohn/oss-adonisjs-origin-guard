@@ -57,7 +57,7 @@ await import('@kevinjohn/adonisjs-origin-guard/types')
 
 // These errors prove the root declarations resolve through to the implementation declarations.
 if (false) {
-  // @ts-expect-error The guard declaration requires a config.
+  // @ts-expect-error The origin-check declaration requires a config.
   createOriginGuard()
   // @ts-expect-error The origins declaration requires a list.
   parseOrigins()
@@ -66,6 +66,6 @@ if (false) {
 }
 TYPESCRIPT
 
-# The Adonis peer declares optional integrations that are absent in a minimal consumer.
+# The AdonisJS peer declares optional integrations that are absent in a minimal consumer.
 "$REPOSITORY_ROOT/node_modules/.bin/tsc" --noEmit --strict --skipLibCheck --module nodenext consumer.mts
 node consumer.mts
