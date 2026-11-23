@@ -42,7 +42,7 @@ flowchart TD
 
 ## Code flow
 
-Scope: package middleware decision; registering it, choosing the origins and disabling Shield CSRF are host-owned.
+Scope: the package middleware and standalone origin decision. Registration, allowed origins and the Shield configuration are host-owned.
 
 ```mermaid
 flowchart TD
