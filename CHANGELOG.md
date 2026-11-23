@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.3.2 - 2026-11-23
+
 - Correction to 0.3.0, whose entry lists documentation only: 0.3.0 also added `createOriginCheck`,
   the same function as `createOriginGuard`, and the `@kevinjohn/adonisjs-origin-guard/types` entry
   for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. Request behaviour, the 403
