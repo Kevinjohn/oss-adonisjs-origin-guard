@@ -1,6 +1,6 @@
 # User story catalogue
 
-Reviewed against source commit `b33d133515cf9f90ca9f3ab0017c3906299e6cf5`, including package entry points, host integration, and startup and request refusal paths.
+Reviewed against source commit `eed8a35548fa42b3c5dd21be2d5a7aed619f6bf5`, including package entry points, host integration, and startup and request refusal paths.
 
 ## Index
 
