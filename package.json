@@ -47,7 +47,8 @@
     ],
     "exclude": [
       "tests/**",
-      "bin/**"
+      "bin/**",
+      "src/types.ts"
     ],
     "all": true,
     "include": [
