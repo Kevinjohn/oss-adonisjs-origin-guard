@@ -3,7 +3,7 @@
 As an application developer, I want browser writes from untrusted origins refused before they reach my routes so that a hostile page cannot make a signed-in user change data, without issuing or checking a CSRF token.
 
 **Status:** Current.
-**Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack.
+**Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack. Hosts can also call the exported decision helper directly.
 **Entry:** `createOriginCheck({ publicOrigin, allowedOrigins })` (also exported as `createOriginGuard`), default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
 **Documentation:** [Refuse cross-site writes](../README.md#refuse-cross-site-writes).
 **Source:** [origin check](../src/origin_check.ts).
@@ -42,7 +42,7 @@ flowchart TD
 
 ## Code flow
 
-Scope: package middleware decision; registering it, choosing the origins and disabling Shield CSRF are host-owned.
+Scope: the package middleware and standalone origin decision. Registration, allowed origins and the Shield configuration are host-owned.
 
 ```mermaid
 flowchart TD
@@ -51,13 +51,16 @@ flowchart TD
     B -->|Yes| N["return next()"]
     B -->|No| R["Read origin and sec-fetch-site via request.header"]
     R --> C["isTrustedUnsafeOrigin({ origin, fetchSite }, config)"]
+    A2["Host directly calls isTrustedUnsafeOrigin(headers, config)"] --> C
     C --> D{"origin empty or absent?"}
     D -->|Yes| E["return fetchSite === 'same-origin'"]
     D -->|No| F["return origin === publicOrigin or allowedOrigins includes origin"]
-    E --> G{"returned true?"}
-    F --> G
+    E --> S{"Who called the helper?"}
+    F --> S
+    S -->|Host code| T["Return boolean to host"]
+    S -->|Middleware| G{"Decision is true?"}
     G -->|Yes| N
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/types.ts).
+**Code references:** [createOriginGuard](../src/origin_check.ts#L26), [isTrustedUnsafeOrigin](../src/origin_check.ts#L11), [OriginGuardConfig](../src/types.ts).

@@ -15,7 +15,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 - The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
 - The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener without echoing the rejected value. An invalid public URL names its setting and a malformed list entry its position; a `*` entry reports neither. The operator corrects the setting and restarts.
 - The module is imported by a preload file rather than living in `config/`, so the validation runs with the HTTP kernel, in the environments its preload entry lists, and not in every process that boots the application.
-- With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403, and the public origin and each listed origin reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with no allowed origins and only the public origin is admitted. The host owns registration and the handler's success response.
+- With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403, and the public origin and each listed origin reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with an empty allowlist. Of the three explicit origins in the fixture, only the public origin is admitted. The [header fallback](US-ORIGIN-01-refuse-cross-site-writes.md) still applies to requests with no or empty Origin. The host owns registration and the handler's success response.
 - Hosts can call the exported parsing functions independently of middleware registration.
 
 ## User flow
@@ -45,11 +45,9 @@ flowchart TD
     B -->|Returns| D["server.use registers lazy middleware"]
     D --> L["Boot server, start HTTP listener"]
     L --> E["Middleware module consumes evaluated config via factory"]
-    E --> M{"GET, HEAD or OPTIONS?"}
-    M -->|Yes| G["return next()"]
-    M -->|No| F{"isTrustedUnsafeOrigin?"}
-    F -->|Yes| G
-    F -->|No| H["response.forbidden: 403"]
+    E --> M["On requests, OriginGuardMiddleware.handle applies US-ORIGIN-01"]
+    M -->|Admitted POST /write| G["Fixture handler returns 200"]
+    M -->|Refused POST /write| H["response.forbidden returns 403"]
 ```
 
-**Code references:** [Fixture kernel](../tests/origins/origin_check/fixture/start/kernel.ts), [environment schema](../tests/origins/origin_check/fixture/start/env.ts), [shared config](../tests/origins/origin_check/fixture/start/origin_config.ts), [middleware module](../tests/origins/origin_check/fixture/start/middleware.ts), [boot harness](../tests/origins/origin_check/boot.spec.ts), [decision logic](../src/origin_check.ts).
+**Code references:** [Fixture kernel](../tests/origins/origin_check/fixture/start/kernel.ts), [environment schema](../tests/origins/origin_check/fixture/start/env.ts), [shared config](../tests/origins/origin_check/fixture/start/origin_config.ts), [middleware module](../tests/origins/origin_check/fixture/start/middleware.ts), [boot harness](../tests/origins/origin_check/boot.spec.ts), [shared request flow](US-ORIGIN-01-refuse-cross-site-writes.md#code-flow).
