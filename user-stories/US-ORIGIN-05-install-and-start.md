@@ -1,4 +1,4 @@
-# US-ORIGIN-05 — Install the guard and validate settings before serving requests
+# US-ORIGIN-05 — Install the origin-check middleware and validate settings before serving requests
 
 As an application developer, I want the HTTP kernel to evaluate my trust settings during startup so that a configuration error surfaces before the first write.
 
@@ -7,14 +7,15 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 **Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`.
 **Documentation:** [Installation and host wiring](../README.md#install).
 **Source:** [Package exports](../index.ts), [type entry](../src/types.ts), [manifest](../package.json).
-**Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts) and [packed consumer checks](../bin/smoke_packed_package.sh).
+**Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts), which boots a host from the source, and [packed consumer checks](../bin/smoke_packed_package.sh), which check the packed types and construction without booting a host.
 
 ## Acceptance criteria
 
 - The documented release installation targets Node 24+ and AdonisJS core 7. `createOriginGuard` and `createOriginCheck` are the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
 - The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
-- The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener. The operator corrects the reported setting and restarts.
-- With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403 and a trusted origin reaches the handler and receives 200. The host owns registration and the handler's success response.
+- The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener without echoing the rejected value. An invalid public URL names its setting and a malformed list entry its position; a `*` entry reports neither. The operator corrects the setting and restarts.
+- The module is imported by a preload file rather than living in `config/`, so the validation runs with the HTTP kernel, in the environments its preload entry lists, and not in every process that boots the application.
+- With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403, and the public origin and each listed origin reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with no allowed origins and only the public origin is admitted. The host owns registration and the handler's success response.
 - Hosts can call the exported parsing functions independently of middleware registration.
 
 ## User flow
