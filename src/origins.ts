@@ -1,8 +1,4 @@
-/** One validated public origin and whether it is served over HTTPS. */
-export interface PublicOrigin {
-  origin: string
-  secure: boolean
-}
+import type { PublicOrigin } from './types.js'
 
 /**
  * Parses a comma-separated list of origins with the WHATWG `URL` parser. Blank entries are skipped;

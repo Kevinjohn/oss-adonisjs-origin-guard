@@ -23,7 +23,8 @@
   "exports": {
     ".": "./build/index.js",
     "./types": {
-      "types": "./build/types.d.ts"
+      "types": "./build/src/types.d.ts",
+      "default": "./build/src/types.js"
     }
   },
   "scripts": {
@@ -97,7 +98,8 @@
   },
   "tsdown": {
     "entry": [
-      "./index.ts"
+      "./index.ts",
+      "./src/types.ts"
     ],
     "outDir": "./build",
     "clean": true,

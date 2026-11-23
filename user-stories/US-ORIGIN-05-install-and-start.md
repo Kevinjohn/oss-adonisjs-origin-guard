@@ -6,7 +6,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 **Access:** Developer with control of the host application, its dependencies and its HTTP kernel.
 **Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`.
 **Documentation:** [Installation and host wiring](../README.md#install).
-**Source:** [Package exports](../index.ts), [type entry](../types.ts), [manifest](../package.json).
+**Source:** [Package exports](../index.ts), [type entry](../src/types.ts), [manifest](../package.json).
 **Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts) and [packed consumer checks](../bin/smoke_packed_package.sh).
 
 ## Acceptance criteria

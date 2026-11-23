@@ -60,4 +60,4 @@ flowchart TD
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/origin_check.ts).
+**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/types.ts).

@@ -52,6 +52,8 @@ assert.equal(isTrustedUnsafeOrigin(headers, config), true)
 const middleware: { handle(context: HttpContext, next: NextFn): Promise<unknown> } =
   new (createOriginGuard(config))()
 assert.equal(typeof middleware.handle, 'function')
+// The type entry has a runtime target, so a side-effect import or re-export of it resolves.
+await import('@kevinjohn/adonisjs-origin-guard/types')
 
 // These errors prove the root declarations resolve through to the implementation declarations.
 if (false) {
