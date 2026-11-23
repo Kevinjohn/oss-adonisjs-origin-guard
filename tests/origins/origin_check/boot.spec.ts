@@ -32,21 +32,19 @@ const bootstrap = `
     const { port } = httpServer.address()
     console.log('HTTP_START_REACHED')
     try {
-      const refused = await fetch('http://127.0.0.1:' + port + '/write', {
-        method: 'POST',
-        headers: { origin: 'https://evil.example' },
-      })
-      const accepted = await fetch('http://127.0.0.1:' + port + '/write', {
-        method: 'POST',
-        headers: { origin: 'https://trusted.example' },
-      })
+      const write = async (origin) => {
+        const response = await fetch('http://127.0.0.1:' + port + '/write', {
+          method: 'POST',
+          headers: { origin },
+        })
+        return { status: response.status, body: await response.text() }
+      }
       console.log(
-        'GUARD_RESULTS',
+        'WRITE_RESULTS',
         JSON.stringify({
-          refused: refused.status,
-          refusedBody: await refused.json(),
-          accepted: accepted.status,
-          acceptedBody: await accepted.text(),
+          foreign: await write('https://evil.example'),
+          listed: await write('https://trusted.example'),
+          public: await write('https://app.example'),
         })
       )
     } finally {
@@ -58,7 +56,10 @@ const bootstrap = `
   await app.terminate()
 `
 
-function startFixture(appUrl: string, corsOrigins: string) {
+const refusal = { status: 403, body: '{"error":"Cross-site request rejected."}' }
+const reached = { status: 200, body: 'handler reached' }
+
+function startFixture(appUrl: string, corsOrigins: string | undefined) {
   const result = spawnSync(
     process.execPath,
     ['--import=@poppinss/ts-exec', '--input-type=module', '-e', bootstrap],
@@ -71,11 +72,16 @@ function startFixture(appUrl: string, corsOrigins: string) {
     }
   )
   if (result.error)
-    throw new Error(`Could not complete Adonis startup fixture: ${result.error.message}`)
+    throw new Error(`Could not complete AdonisJS startup fixture: ${result.error.message}`)
   return result
 }
 
-test.group('eager origin validation during Adonis startup', () => {
+function writeResults(stdout: string) {
+  const line = stdout.split('\n').find((output) => output.startsWith('WRITE_RESULTS '))
+  return line ? JSON.parse(line.slice('WRITE_RESULTS '.length)) : undefined
+}
+
+test.group('eager origin validation during AdonisJS startup', () => {
   test('stops startup when APP_URL is invalid', ({ assert }) => {
     const result = startFixture('http://app.example', '')
 
@@ -92,14 +98,38 @@ test.group('eager origin validation during Adonis startup', () => {
     assert.include(result.stderr, 'Invalid CORS origin')
   })
 
+  test('stops startup for a wildcard CORS_ORIGINS entry without naming the setting', ({
+    assert,
+  }) => {
+    const result = startFixture('https://app.example', 'https://trusted.example,*')
+
+    assert.notEqual(result.status, 0)
+    assert.notInclude(result.stdout, 'HTTP_START_REACHED')
+    assert.include(result.stderr, 'CORS requires explicit origins when credentials are enabled')
+    assert.notInclude(result.stderr, 'CORS_ORIGINS')
+  })
+
   test('starts when both APP_URL and CORS_ORIGINS are valid', ({ assert }) => {
     const result = startFixture('https://app.example', 'https://trusted.example')
 
     assert.equal(result.status, 0, result.stderr)
     assert.include(result.stdout, 'HTTP_START_REACHED')
-    assert.include(
-      result.stdout,
-      'GUARD_RESULTS {"refused":403,"refusedBody":{"error":"Cross-site request rejected."},"accepted":200,"acceptedBody":"guard reached"}'
-    )
+    assert.deepEqual(writeResults(result.stdout), {
+      foreign: refusal,
+      listed: reached,
+      public: reached,
+    })
+  })
+
+  test('starts with no allowed origins when CORS_ORIGINS is omitted', ({ assert }) => {
+    const result = startFixture('https://app.example', undefined)
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.include(result.stdout, 'HTTP_START_REACHED')
+    assert.deepEqual(writeResults(result.stdout), {
+      foreign: refusal,
+      listed: refusal,
+      public: reached,
+    })
   })
 })

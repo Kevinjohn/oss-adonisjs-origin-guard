@@ -29,3 +29,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # The same packed-package smoke the release gate runs, so export-map and alias breaks fail here.
+      - name: Smoke the packed package
+        run: |
+          rm -rf tmp/checks && mkdir -p tmp/checks
+          pnpm pack --pack-destination tmp/checks >/dev/null
+          bash bin/smoke_packed_package.sh "$(ls tmp/checks/*.tgz)"

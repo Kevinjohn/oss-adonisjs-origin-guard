@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { HttpContextFactory, RequestFactory } from '@adonisjs/core/factories/http'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
-import { createOriginGuard, isTrustedUnsafeOrigin } from '../index.js'
+import { createOriginCheck, createOriginGuard, isTrustedUnsafeOrigin } from '../index.js'
 
 const config = {
   publicOrigin: 'https://wayne.example',
@@ -96,6 +96,10 @@ test.group('isTrustedUnsafeOrigin', () => {
 })
 
 test.group('createOriginGuard', () => {
+  test('is the same function as the root createOriginCheck alias', ({ assert }) => {
+    assert.strictEqual(createOriginCheck, createOriginGuard)
+  })
+
   const OriginCheck = createOriginGuard(config)
 
   test('POST {name}')

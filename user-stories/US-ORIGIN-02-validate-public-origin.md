@@ -54,4 +54,4 @@ flowchart TD
     E -->|No| G["return { origin, secure }"]
 ```
 
-**Code references:** [resolvePublicOrigin](../src/origins.ts), [PublicOrigin](../src/origins.ts).
+**Code references:** [resolvePublicOrigin](../src/origins.ts), [PublicOrigin](../src/types.ts).

@@ -4,7 +4,7 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 **Status:** Current.
 **Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack.
-**Entry:** `createOriginCheck({ publicOrigin, allowedOrigins })`, (also exported as `createOriginGuard`), default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
+**Entry:** `createOriginCheck({ publicOrigin, allowedOrigins })` (also exported as `createOriginGuard`), default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
 **Documentation:** [Refuse cross-site writes](../README.md#refuse-cross-site-writes).
 **Source:** [origin check](../src/origin_check.ts).
 **Coverage:** [Origin-check tests](../tests/origin_check.spec.ts).
@@ -60,4 +60,4 @@ flowchart TD
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/origin_check.ts).
+**Code references:** [createOriginGuard](../src/origin_check.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/types.ts).
