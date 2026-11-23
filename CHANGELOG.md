@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Correction to 0.3.0, whose entry lists documentation only: 0.3.0 also added `createOriginCheck`,
+  the same function as `createOriginGuard`, and the `@kevinjohn/adonisjs-origin-guard/types` entry
+  for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. Request behaviour, the 403
+  body and the existing exports did not change.
+- The `./types` entry now has a runtime module, so a side-effect import, a re-export or an inline
+  type import kept at runtime resolves instead of failing with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- The package description calls the write check origin-check middleware instead of a guard.
+
 ## 0.3.1 - 2026-11-22
 
 - Document the shipped `createOriginCheck` alias and the public `/types` entry, and use the alias
