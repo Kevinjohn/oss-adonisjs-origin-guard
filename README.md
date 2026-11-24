@@ -17,7 +17,7 @@ before reading them from `#start/env`.
 Releases are GitHub release tarballs; the package is not on the npm registry.
 
 ```sh
-pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.3.3/kevinjohn-adonisjs-origin-guard-0.3.3.tgz
+pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.4.0/kevinjohn-adonisjs-origin-guard-0.4.0.tgz
 ```
 
 Manual middleware registration is the package convention; there is no provider or Ace configure hook.
@@ -116,12 +116,9 @@ such as a script using a bare HTTP library, must send `Origin`.
 
 ### Configuration errors
 
-In the unreleased API, both origin helpers throw `InvalidArgumentsException` from
+Both origin helpers throw `InvalidArgumentsException` from
 `@adonisjs/core/exceptions` when configuration is invalid. Applications can recognize these failures with
 `error instanceof InvalidArgumentsException`.
-
-The v0.3.3 release installed above throws plain `Error` instead; see the
-[v0.3.3 origin helpers](https://github.com/Kevinjohn/oss-adonisjs-origin-guard/blob/v0.3.3/README.md#parse-origins).
 
 ## Trust a proxy
 
