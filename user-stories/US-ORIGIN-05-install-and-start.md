@@ -4,7 +4,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 **Status:** Operator.
 **Access:** Developer with control of the host application, its dependencies and its HTTP kernel.
-**Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`. The example below describes the current source and fixture, not a test of the release tarball; v0.3.3 throws plain `Error` where current source throws `InvalidArgumentsException` ([guide](../README.md#configuration-errors)).
+**Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`. In v0.4.0, invalid origin configuration throws `InvalidArgumentsException` ([guide](../README.md#configuration-errors)).
 **Documentation:** [Installation and host wiring](../README.md#install).
 **Source:** [Package exports](../index.ts), [type entry](../src/types.ts), [manifest](../package.json).
 **Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts), which boots a host from the source, and [packed consumer checks](../bin/smoke_packed_package.sh), which check the packed types and construction without booting a host.

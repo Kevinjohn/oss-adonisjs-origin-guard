@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-24
+
 - `parseOrigins` and `resolvePublicOrigin` now throw AdonisJS core's `InvalidArgumentsException`
   in place of a bare `Error` for invalid configuration.
 - Add application examples to all public functions, including both middleware factory names.
