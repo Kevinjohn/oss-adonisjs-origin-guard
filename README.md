@@ -22,11 +22,8 @@ pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/downloa
 
 Manual middleware registration is the package convention; there is no provider or Ace configure hook.
 All host trust settings remain host-owned. Invalid settings fail startup without echoing the
-rejected value. An invalid public origin names the setting the host passes to
-`resolvePublicOrigin`; a malformed list entry reports its one-based position. A `*` list entry is
-the exception: it fails with `CORS requires explicit origins when credentials are enabled`, which
-names neither the setting nor a position. The parsing functions remain usable without middleware
-registration. Since v0.3.0, public types are also available from
+rejected value. The [origin configuration helpers](#parse-origins) are also usable without
+middleware registration. Since v0.3.0, public types are available from
 `@kevinjohn/adonisjs-origin-guard/types`.
 
 ## Refuse cross-site writes
@@ -47,7 +44,9 @@ export const originCheckConfig = {
 Import that module from `start/kernel.ts` before registering the lazy middleware. AdonisJS imports
 the kernel preload file when the application starts; this eager import makes invalid origin
 settings stop startup before the HTTP server begins handling requests. Keep the middleware import
-lazy, and have it consume the already evaluated configuration:
+lazy, and have it consume the already evaluated configuration. Default-export the server middleware
+constructor returned by `createOriginCheck(config)`. Since v0.3.0, `createOriginGuard` is a
+compatibility alias for the same factory and can be used in the same example.
 
 ```ts
 // app/middleware/origin_check_middleware.ts
@@ -98,17 +97,18 @@ configuration; it does not parse or revalidate the configured origins on each re
 Turn off Shield's token-based CSRF if this middleware replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
 
-Since v0.3.0, `createOriginCheck` and `createOriginGuard` are two names for the same factory.
-
 ## Parse origins
 
-- `parseOrigins(list)` takes a comma-separated string and returns each origin in the form a browser
-  sends. It throws on any entry whose WHATWG-parsed URL has credentials, a path other than `/`, a
-  non-empty query or a non-empty fragment, reporting the entry's one-based position without
-  echoing the rejected value. A `*` entry throws
-  `CORS requires explicit origins when credentials are enabled` instead, with no position. Parsing
-  normalises equivalent URL spellings, such as host case, default ports and a root slash, before
-  returning `URL.origin`.
+- `parseOrigins(list)` is a public package-root helper that validates a comma-separated configuration
+  string and returns canonical HTTP(S) origins as a `string[]`. It trims each entry and skips
+  blanks, so an empty or all-blank list returns `[]`. It uses the WHATWG `URL` parser and returns
+  `URL.origin` for each valid entry, normalising host case, default ports and a trailing root slash.
+- A malformed URL, a non-HTTP(S) scheme, credentials, a parsed path other than `/`, a non-empty
+  query or a non-empty fragment causes `parseOrigins` to throw an `Error`. The message is
+  `Invalid CORS origin at position <position>: expected a bare HTTP(S) origin`, with the one-based
+  position in the original list (including blanks) and without the rejected value.
+- A `*` entry causes `parseOrigins` to throw an `Error` with the message
+  `CORS requires explicit origins when credentials are enabled` and no list position.
 - `resolvePublicOrigin(value, environment, variable)` validates the one origin the application is
   served from and returns `{ origin, secure }`. HTTPS is required in production, and outside
   `localhost`, `127.0.0.1` and `[::1]` in development and test. `variable` names the setting in the
