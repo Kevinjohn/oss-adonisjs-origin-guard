@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.3.3 - 2026-11-24
+
+- Document how the public origin parser normalises entries, ignores blanks and reports invalid or wildcard origins.
+
 ## 0.3.2 - 2026-11-23
 
 - Correction to 0.3.0, whose entry lists documentation only: 0.3.0 also added `createOriginCheck`,

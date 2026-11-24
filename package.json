@@ -1,7 +1,7 @@
 {
   "name": "@kevinjohn/adonisjs-origin-guard",
   "description": "Bare-origin parsing, header-based origin-check middleware for cross-site writes and a private-peer check for AdonisJS 7",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "engines": {
     "node": ">=24.0.0"
   },
