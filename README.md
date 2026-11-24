@@ -116,9 +116,12 @@ such as a script using a bare HTTP library, must send `Origin`.
 
 ### Configuration errors
 
-Both origin helpers throw `InvalidArgumentsException` from `@adonisjs/core/exceptions` when
-configuration is invalid. Applications can recognize these failures with
+In the unreleased API, both origin helpers throw `InvalidArgumentsException` from
+`@adonisjs/core/exceptions` when configuration is invalid. Applications can recognize these failures with
 `error instanceof InvalidArgumentsException`.
+
+The v0.3.3 release installed above throws plain `Error` instead; see the
+[v0.3.3 origin helpers](https://github.com/Kevinjohn/oss-adonisjs-origin-guard/blob/v0.3.3/README.md#parse-origins).
 
 ## Trust a proxy
 
