@@ -1,3 +1,4 @@
+import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
 import { test } from '@japa/runner'
 import { parseOrigins, resolvePublicOrigin } from '../index.js'
 
@@ -13,6 +14,7 @@ test.group('parseOrigins', () => {
   test('refuses a wildcard', ({ assert }) => {
     assert.throws(
       () => parseOrigins('https://wayne.example,*'),
+      InvalidArgumentsException,
       'CORS requires explicit origins when credentials are enabled'
     )
   })
@@ -29,6 +31,7 @@ test.group('parseOrigins', () => {
     ]) {
       assert.throws(
         () => parseOrigins(invalid),
+        InvalidArgumentsException,
         'Invalid CORS origin at position 1: expected a bare HTTP(S) origin'
       )
     }
@@ -43,8 +46,8 @@ test.group('parseOrigins', () => {
       thrown = error
     }
 
-    assert.isTrue(thrown instanceof Error)
-    const message = thrown instanceof Error ? thrown.message : ''
+    assert.instanceOf(thrown, InvalidArgumentsException)
+    const message = (thrown as InvalidArgumentsException).message
     assert.include(message, 'Invalid CORS origin at position 3:')
     assert.notInclude(message, rejected)
     assert.notInclude(message, 'dummy-secret')
@@ -71,6 +74,7 @@ test.group('resolvePublicOrigin', () => {
         })
       assert.throws(
         () => resolvePublicOrigin(origin, 'production', 'APP_URL'),
+        InvalidArgumentsException,
         'APP_URL: public production origins require HTTPS'
       )
     }
@@ -80,6 +84,7 @@ test.group('resolvePublicOrigin', () => {
     for (const value of ['http://wayne.example', 'http://127.0.0.2'])
       assert.throws(
         () => resolvePublicOrigin(value, 'test', 'PUBLIC_URL'),
+        InvalidArgumentsException,
         'PUBLIC_URL must use HTTPS outside loopback in development/test'
       )
   })
@@ -97,6 +102,7 @@ test.group('resolvePublicOrigin', () => {
     ])
       assert.throws(
         () => resolvePublicOrigin(value, 'test', 'PUBLIC_URL'),
+        InvalidArgumentsException,
         'PUBLIC_URL must be a bare HTTP(S) origin'
       )
   })

@@ -104,15 +104,21 @@ such as a script using a bare HTTP library, must send `Origin`.
   blanks, so an empty or all-blank list returns `[]`. It uses the WHATWG `URL` parser and returns
   `URL.origin` for each valid entry, normalising host case, default ports and a trailing root slash.
 - A malformed URL, a non-HTTP(S) scheme, credentials, a parsed path other than `/`, a non-empty
-  query or a non-empty fragment causes `parseOrigins` to throw an `Error`. The message is
-  `Invalid CORS origin at position <position>: expected a bare HTTP(S) origin`, with the one-based
-  position in the original list (including blanks) and without the rejected value.
-- A `*` entry causes `parseOrigins` to throw an `Error` with the message
-  `CORS requires explicit origins when credentials are enabled` and no list position.
+  query or a non-empty fragment is reported as
+  `Invalid CORS origin at position <position>: expected a bare HTTP(S) origin`. The message includes
+  the one-based position in the original list (including blanks) and omits the rejected value.
+- A `*` entry is reported as `CORS requires explicit origins when credentials are enabled`,
+  without a list position.
 - `resolvePublicOrigin(value, environment, variable)` validates the one origin the application is
   served from and returns `{ origin, secure }`. HTTPS is required in production, and outside
   `localhost`, `127.0.0.1` and `[::1]` in development and test. `variable` names the setting in the
   error message.
+
+### Configuration errors
+
+Both origin helpers throw `InvalidArgumentsException` from `@adonisjs/core/exceptions` when
+configuration is invalid. Applications can recognize these failures with
+`error instanceof InvalidArgumentsException`.
 
 ## Trust a proxy
 
@@ -121,6 +127,7 @@ such as a script using a bare HTTP library, must send `Origin`.
 
 ```ts
 // config/app.ts
+import { defineConfig } from '@adonisjs/core/http'
 import { isPrivatePeer } from '@kevinjohn/adonisjs-origin-guard'
 
 export const http = defineConfig({ trustProxy: isPrivatePeer })

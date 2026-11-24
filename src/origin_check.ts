@@ -7,6 +7,19 @@ import type { OriginGuardConfig, UnsafeRequestHeaders } from './types.js'
  * origin or an allowed origin exactly; nothing is normalised. Without `Origin`, or with an empty
  * one, only `Sec-Fetch-Site: same-origin` is accepted. `Host` and the request protocol are never
  * consulted.
+ *
+ * @example
+ * ```ts
+ * import { isTrustedUnsafeOrigin } from '@kevinjohn/adonisjs-origin-guard'
+ * import type { HttpContext } from '@adonisjs/core/http'
+ *
+ * function acceptsWrite({ request }: HttpContext) {
+ *   return isTrustedUnsafeOrigin(
+ *     { origin: request.header('origin'), fetchSite: request.header('sec-fetch-site') },
+ *     { publicOrigin: 'https://app.example' }
+ *   )
+ * }
+ * ```
  */
 export function isTrustedUnsafeOrigin(
   { origin, fetchSite }: UnsafeRequestHeaders,
@@ -22,6 +35,16 @@ export function isTrustedUnsafeOrigin(
  * and the rest of the stack does not run. Supply origins validated by `resolvePublicOrigin` and
  * `parseOrigins` before startup; the middleware compares request headers against that config without
  * validating the config on each request. Default-export the returned class from a middleware file.
+ *
+ * @example
+ * ```ts
+ * import { createOriginGuard, parseOrigins, resolvePublicOrigin } from '@kevinjohn/adonisjs-origin-guard'
+ *
+ * export default createOriginGuard({
+ *   publicOrigin: resolvePublicOrigin('https://app.example', 'production', 'APP_URL').origin,
+ *   allowedOrigins: parseOrigins('https://admin.example'),
+ * })
+ * ```
  */
 export function createOriginGuard(config: OriginGuardConfig) {
   return class OriginGuardMiddleware {
