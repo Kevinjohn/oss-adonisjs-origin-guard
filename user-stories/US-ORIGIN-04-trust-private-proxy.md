@@ -29,7 +29,7 @@ flowchart TD
     B --> C{"Immediate socket peer is loopback or private?"}
     C -->|Yes| D["AdonisJS may use forwarded host and protocol metadata when applicable"]
     C -->|No| E["AdonisJS uses request host and socket protocol"]
-    B --> F["For client-IP lookup, AdonisJS walks the X-Forwarded-For chain and stops at the first untrusted address"]
+    B --> F["When client IP is requested, AdonisJS can walk X-Forwarded-For and stop at the first untrusted address"]
     G["Operator network rules restrict who can reach the app through trusted peers"] -.-> C
 ```
 
@@ -40,9 +40,9 @@ Scope: package address check; applying forwarded headers is AdonisJS's `trustPro
 ```mermaid
 flowchart TD
     A["isPrivatePeer(address)"] --> B["Extract dotted mapped IPv4 if matched; otherwise retain address"]
-    B --> C{"isIP(ip) is 0?"}
+    B --> C{"isIP(peerAddress) is 0?"}
     C -->|Yes| D["return false"]
-    C -->|No| E["privateAddressRanges.check(ip, ipv4 or ipv6)"]
+    C -->|No| E["privateAddressRanges.check(peerAddress, ipv4 or ipv6)"]
     E --> F["return match"]
 ```
 

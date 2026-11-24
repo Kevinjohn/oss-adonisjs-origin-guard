@@ -1,6 +1,10 @@
 # Decision gaps
 
-None was identified between the [README](../README.md), the [changelog](../CHANGELOG.md) and the [source](../src/) during this catalogue pass. No separate product decision record is present. The following boundaries are retained intentionally, not unresolved feature requests.
+No separate product decision record is present. The documented release and current source differ as described below. The remaining boundaries are retained, not unresolved feature requests.
+
+| Gap                              | Agreed target                                                                                           | Current implementation                                                      | Catalogue treatment                                                                         | Resolution needed                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Release versus source exceptions | The [guide](../README.md#configuration-errors) identifies the v0.3.3 release as throwing plain `Error`. | The current [helpers](../src/origins.ts) throw `InvalidArgumentsException`. | Stories describe the reviewed source; the install story identifies the release distinction. | A future release would be needed to deliver the current exception type to release-tarball consumers. |
 
 | Boundary                        | Contract and source                                                                                                                               | Catalogue treatment                                                                                                           |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |

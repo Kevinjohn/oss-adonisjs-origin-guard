@@ -4,7 +4,7 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 **Status:** Operator.
 **Access:** Developer with control of the host application, its dependencies and its HTTP kernel.
-**Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`.
+**Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`. The example below describes the current source and fixture, not a test of the release tarball; v0.3.3 throws plain `Error` where current source throws `InvalidArgumentsException` ([guide](../README.md#configuration-errors)).
 **Documentation:** [Installation and host wiring](../README.md#install).
 **Source:** [Package exports](../index.ts), [type entry](../src/types.ts), [manifest](../package.json).
 **Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts), which boots a host from the source, and [packed consumer checks](../bin/smoke_packed_package.sh), which check the packed types and construction without booting a host.
@@ -13,9 +13,9 @@ As an application developer, I want the HTTP kernel to evaluate my trust setting
 
 - The documented release installation targets Node 24+ and AdonisJS core 7. `createOriginGuard` and `createOriginCheck` are the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
 - The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
-- The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. Invalid public URL or trusted-list settings stop startup before the HTTP listener without echoing the rejected value. An invalid public URL names its setting and a malformed list entry its position; a `*` entry reports neither. The operator corrects the setting and restarts.
+- The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. In the documented wiring, invalid values rejected by the origin helpers stop startup before the HTTP listener without echoing the rejected value. An invalid public URL names its setting and a malformed list entry its position; a `*` entry reports neither. The operator corrects the setting and restarts.
 - The module is imported by a preload file rather than living in `config/`, so the validation runs with the HTTP kernel, in the environments its preload entry lists, and not in every process that boots the application.
-- With valid settings the host starts. On the fixture's POST endpoint an untrusted origin receives 403, and the public origin and each listed origin reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with an empty allowlist. Of the three explicit origins in the fixture, only the public origin is admitted. The [header fallback](US-ORIGIN-01-refuse-cross-site-writes.md) still applies to requests with no or empty Origin. The host owns registration and the handler's success response.
+- With valid settings the fixture starts. On its POST endpoint the tested foreign origin receives 403, and the tested public and listed origins reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with an empty allowlist. Of the three explicit origins in the fixture, only the public origin is admitted. The [header fallback](US-ORIGIN-01-refuse-cross-site-writes.md) still applies to requests with no or empty Origin. The host owns registration and the handler's success response.
 - Hosts can call the exported parsing functions independently of middleware registration.
 
 ## User flow
@@ -25,7 +25,7 @@ flowchart TD
     A["Install release and wire host middleware"] --> S["Set public URL and optional trusted origins"]
     S --> B{"Settings valid at boot?"}
     B -->|No| C["See configuration error; correct settings and restart"]
-    C --> B
+    C --> S
     B -->|Yes| D["HTTP listener starts"]
     D --> E{"Request admitted by origin check?"}
     E -->|Yes| F["Request reaches remaining stack"]
@@ -44,7 +44,7 @@ flowchart TD
     B -->|Throws| C
     B -->|Returns| D["server.use registers lazy middleware"]
     D --> L["Boot server, start HTTP listener"]
-    L --> E["Middleware module consumes evaluated config via factory"]
+    L --> E["Lazy middleware module consumes evaluated config via createOriginCheck"]
     E --> M["On requests, OriginGuardMiddleware.handle applies US-ORIGIN-01"]
     M -->|Admitted POST /write| G["Fixture handler returns 200"]
     M -->|Refused POST /write| H["response.forbidden returns 403"]
