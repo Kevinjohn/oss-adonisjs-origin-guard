@@ -4,7 +4,7 @@ As an application operator, I want the origin my application is served from chec
 
 **Status:** Operator.
 **Access:** Operator who sets the host's public URL setting (for example `APP_URL`); host code passes it in, since the package reads no environment variable.
-**Entry:** `resolvePublicOrigin(value, environment, variable)`, called from an eagerly imported host startup/config module. The HTTP kernel imports that module before registering the lazy origin-check middleware; the middleware consumes the resulting configuration.
+**Entry:** `resolvePublicOrigin(value, environment, variable)`; the documented host example calls it from a module eagerly imported by the HTTP kernel before lazy middleware registration. Hosts may call it independently.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -20,8 +20,8 @@ As an application operator, I want the origin my application is served from chec
 - A valid value returns `{ origin, secure }`, where `secure` is true for HTTPS.
 - HTTPS is required in production. Plain HTTP is accepted in development and test only on `localhost`, `127.0.0.1` or `[::1]`.
 - The host declares `APP_URL` in the `start/env.ts` schema (for example, `APP_URL: Env.schema.string()`) before reading it through `#start/env`.
-- A value that does not parse, is not HTTP(S), carries credentials or differs from its serialized origin throws `<variable> must be a bare HTTP(S) origin` during HTTP startup. Invalid configuration prevents the app reaching ready state or handling requests.
-- Plain HTTP throws `<variable>: public production origins require HTTPS` in production. In development and test it throws `<variable> must use HTTPS outside loopback in development/test` unless the hostname is `localhost`, `127.0.0.1` or `[::1]`. The host corrects the setting and restarts.
+- A value that does not parse, is not HTTP(S), carries credentials or differs from its serialized origin throws `<variable> must be a bare HTTP(S) origin` as `InvalidArgumentsException`. In the documented eager startup wiring, this prevents HTTP startup.
+- `InvalidArgumentsException` for plain HTTP reports `<variable>: public production origins require HTTPS` in production. In development and test it throws `<variable> must use HTTPS outside loopback in development/test` unless the hostname is `localhost`, `127.0.0.1` or `[::1]`. The host corrects the setting and retries; the startup example requires a restart.
 
 The comparison uses the complete input string. Host case, an explicit default port or a trailing slash that changes on serialisation fails the bare-origin check. A canonical non-default port remains part of the origin.
 
