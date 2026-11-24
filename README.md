@@ -17,7 +17,7 @@ before reading them from `#start/env`.
 Releases are GitHub release tarballs; the package is not on the npm registry.
 
 ```sh
-pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.3.2/kevinjohn-adonisjs-origin-guard-0.3.2.tgz
+pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.3.3/kevinjohn-adonisjs-origin-guard-0.3.3.tgz
 ```
 
 Manual middleware registration is the package convention; there is no provider or Ace configure hook.
