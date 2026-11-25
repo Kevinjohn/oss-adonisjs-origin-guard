@@ -96,12 +96,13 @@ cat > package.json <<'JSON'
 {"type":"module","imports":{"#start/*":"./start/*.js"}}
 JSON
 cat > tsconfig.json <<'JSON'
-{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext"}}
+{"compilerOptions":{"module":"NodeNext","moduleResolution":"NodeNext","rewriteRelativeImportExtensions":true}}
 JSON
 printf 'NODE_ENV=test\n' > .env
 cp .env .env.example
 env -u ENV_PATH NODE_ENV=test node --import="$TS_LOADER" ace.ts configure @kevinjohn/adonisjs-origin-guard
 OUTPUT=$(env -u ENV_PATH NODE_ENV=test ORIGIN_GUARD_PUBLIC_ORIGIN=https://app.example \
   ORIGIN_GUARD_ALLOWED_ORIGINS=https://trusted.example node --import="$TS_LOADER" boot.ts)
+printf '%s\n' "$OUTPUT"
 [[ "$OUTPUT" == *'HTTP_START_REACHED'* ]]
 [[ "$OUTPUT" == *'WRITE_RESULTS {"foreign":{"status":403,"body":"{\"error\":\"Cross-site request rejected.\"}"},"listed":{"status":200,"body":"handler reached"},"public":{"status":200,"body":"handler reached"}}'* ]]
