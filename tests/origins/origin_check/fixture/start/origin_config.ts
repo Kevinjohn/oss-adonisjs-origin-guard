@@ -1,5 +1,5 @@
-import { parseOrigins, resolvePublicOrigin } from '../../../../../index.js'
-import env from './env.js'
+import { parseOrigins, resolvePublicOrigin } from '../../../../../index.ts'
+import env from './env.ts'
 
 export const originCheckConfig = {
   publicOrigin: resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin,

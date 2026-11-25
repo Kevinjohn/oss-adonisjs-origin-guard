@@ -1,6 +1,6 @@
 import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
 import { test } from '@japa/runner'
-import { parseOrigins, resolvePublicOrigin } from '../index.js'
+import { parseOrigins, resolvePublicOrigin } from '../index.ts'
 
 test.group('parseOrigins', () => {
   test('returns each entry in serialized form and skips blanks', ({ assert }) => {

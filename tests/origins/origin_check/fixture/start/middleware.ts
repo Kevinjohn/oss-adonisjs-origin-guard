@@ -1,4 +1,4 @@
-import { createOriginCheck } from '../../../../../index.js'
-import { originCheckConfig } from './origin_config.js'
+import { createOriginCheck } from '../../../../../index.ts'
+import { originCheckConfig } from './origin_config.ts'
 
 export default createOriginCheck(originCheckConfig)
