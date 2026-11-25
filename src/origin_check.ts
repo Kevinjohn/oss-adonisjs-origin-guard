@@ -1,6 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
-import type { OriginGuardConfig, UnsafeRequestHeaders } from './types.js'
+import type { OriginGuardConfig, UnsafeRequestHeaders } from './types.ts'
 
 /**
  * Whether an unsafe request comes from a trusted origin. With `Origin`, it must equal the public
