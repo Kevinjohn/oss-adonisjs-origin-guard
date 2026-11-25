@@ -9,76 +9,59 @@ Origin handling for an AdonisJS 7 application behind a browser:
 
 ## Install
 
-Releases are GitHub release tarballs; the package is not on the npm registry.
+Releases are distributed as GitHub release tarballs. The configure hook described below is
+unreleased. For the published v0.4.0 setup and installation, use the
+[v0.4.0 README](https://github.com/Kevinjohn/oss-adonisjs-origin-guard/blob/v0.4.0/README.md).
+
+To try the unreleased setup, run `pnpm build && pnpm pack` in this repository. In your AdonisJS
+application, install that archive and run the configure command by package name:
 
 ```sh
-pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.4.0/kevinjohn-adonisjs-origin-guard-0.4.0.tgz
+pnpm add /absolute/path/to/kevinjohn-adonisjs-origin-guard-0.4.0.tgz
+node ace configure @kevinjohn/adonisjs-origin-guard
 ```
 
-## Setup
+The configure command needs the application's `@adonisjs/assembler` development dependency.
 
-Installation currently requires manual middleware registration; there is no provider or Ace configure hook.
-All host trust settings remain host-owned. Invalid settings fail startup without echoing the
-rejected value. The [origin configuration helpers](#parse-origins) are also usable without
-middleware registration. Since v0.3.0, public types are available from
-`@kevinjohn/adonisjs-origin-guard/types`.
+## What the configure hook changes
+
+- Creates `config/origin_guard.ts`.
+- Adds the origin settings to `start/env.ts` and inserts blank placeholders for new settings in existing
+  `.env` and `.env.example` files.
+- Registers `@kevinjohn/adonisjs-origin-guard/origin_guard_middleware` at the front of the server
+  middleware stack in `start/kernel.ts`.
+
+You can rerun the command after editing the generated config or filling in the environment values.
 
 ## Configuration
 
-The package reads no environment variable; the
-host passes every value in. The host must declare `APP_URL` in `start/env.ts`, for example as
-`APP_URL: Env.schema.string()`, and optionally `CORS_ORIGINS: Env.schema.string.optional()`,
-before reading them from `#start/env`.
+Set `ORIGIN_GUARD_PUBLIC_ORIGIN` to the canonical public origin of your application, such as
+`https://app.example`. For local development and tests, you can use HTTP on `localhost`, `127.0.0.1`
+or `[::1]` with the application's port. Set `ORIGIN_GUARD_ALLOWED_ORIGINS` only if additional
+origins should be allowed to write. Use a comma-separated list of trusted HTTP(S) origins.
 
-Validate the host settings in a module shared by the eagerly loaded kernel and the middleware:
+The generated config reads your application's environment settings:
 
 ```ts
-// start/origin_config.ts
+// config/origin_guard.ts
 import env from '#start/env'
-import { parseOrigins, resolvePublicOrigin } from '@kevinjohn/adonisjs-origin-guard'
+import { defineConfig } from '@kevinjohn/adonisjs-origin-guard'
 
-export const originCheckConfig = {
-  publicOrigin: resolvePublicOrigin(env.get('APP_URL'), env.get('NODE_ENV'), 'APP_URL').origin,
-  allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
-}
+export default defineConfig({
+  publicOrigin: env.get('ORIGIN_GUARD_PUBLIC_ORIGIN'),
+  allowedOrigins: env.get('ORIGIN_GUARD_ALLOWED_ORIGINS'),
+  environment: env.get('NODE_ENV'),
+})
 ```
 
-Reading `env` in `start/` rather than `config/` is a deliberate exception to the AdonisJS
-convention. AdonisJS imports every `config/` file in every process that boots the application,
-with no way to limit them by environment, so validating there would let an origin setting stop
-processes that never serve HTTP. A preload file's `adonisrc.ts` entry can list the environments it
-runs in, so the validation follows the HTTP kernel: the startup fixture lists
-`environment: ['web']`, and a kernel entry with no list also runs in tests and in Ace commands that
-start the application. If a `config/` file reads the raw values instead, keep the
-`resolvePublicOrigin` and `parseOrigins` calls in the preloaded module so validation still runs
-with the kernel.
+The application owns these settings. Set them in each environment that boots the application,
+including when running Ace commands that boot it. AdonisJS evaluates `defineConfig` when it
+loads the config during boot, before the first request. An omitted allowlist trusts only the
+public origin when a request sends `Origin`.
 
 ## Usage
 
 ### Refuse cross-site writes
-
-Import that module from `start/kernel.ts` before registering the lazy middleware. AdonisJS imports
-the kernel preload file when the application starts; this eager import makes invalid origin
-settings stop startup before the HTTP server begins handling requests. Keep the middleware import
-lazy, and have it consume the already evaluated configuration. Default-export the server middleware
-constructor returned by `createOriginCheck(config)`. Since v0.3.0, `createOriginGuard` is a
-compatibility alias for the same factory and can be used in the same example.
-
-```ts
-// app/middleware/origin_check_middleware.ts
-import { createOriginCheck } from '@kevinjohn/adonisjs-origin-guard'
-import { originCheckConfig } from '#start/origin_config'
-
-export default createOriginCheck(originCheckConfig)
-```
-
-Register it as server middleware in `start/kernel.ts`, before anything that acts on a write:
-
-```ts
-import '#start/origin_config'
-
-server.use([() => import('#middleware/origin_check_middleware')])
-```
 
 The origin-check middleware lets `GET`, `HEAD` and `OPTIONS` through. For every other method:
 
@@ -94,11 +77,6 @@ A refusal answers `403` with `{ "error": "Cross-site request rejected." }` and t
 stack does not run. `Origin` is compared as sent: nothing is normalised, and `Host` and the request
 protocol are never consulted. `isTrustedUnsafeOrigin(headers, config)` is the same decision as a
 function.
-
-Pass a `publicOrigin` produced by `resolvePublicOrigin` and `allowedOrigins` produced by
-`parseOrigins` (or an equivalent validated serialized HTTP(S) origin list). Validate host-owned
-settings once during eager startup as shown in the startup example above. The per-request origin check compares headers with that
-configuration; it does not parse or revalidate the configured origins on each request.
 
 Turn off Shield's token-based CSRF if this middleware replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
@@ -142,9 +120,10 @@ application still needs network rules that control who can supply forwarded head
 
 ## Configuration errors
 
-Both origin helpers throw `InvalidArgumentsException` from
-`@adonisjs/core/exceptions` when configuration is invalid. Applications can recognize these failures with
-`error instanceof InvalidArgumentsException`.
+`defineConfig`, `parseOrigins` and `resolvePublicOrigin` throw `InvalidArgumentsException` from
+`@adonisjs/core/exceptions` for invalid origin settings. The configuration errors from
+`defineConfig` identify the key in `config/origin_guard.ts` and omit the rejected value. Correct
+the setting and restart the application.
 
 ## Supported AdonisJS versions
 

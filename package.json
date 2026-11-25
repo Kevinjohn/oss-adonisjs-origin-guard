@@ -25,7 +25,8 @@
     "./types": {
       "types": "./build/src/types.d.ts",
       "default": "./build/src/types.js"
-    }
+    },
+    "./origin_guard_middleware": "./build/src/origin_guard_middleware.js"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -37,7 +38,7 @@
     "test": "c8 pnpm quick:test",
     "check:changed": "node --import=@poppinss/ts-exec --enable-source-maps bin/check_changed.ts",
     "precompile": "pnpm lint",
-    "compile": "tsdown && tsc --emitDeclarationOnly --declaration",
+    "compile": "tsdown && tsc --emitDeclarationOnly --declaration && copyfiles --up=1 \"stubs/**/*.stub\" build/stubs",
     "build": "pnpm compile"
   },
   "c8": {
@@ -79,28 +80,40 @@
     "url": "git+https://github.com/Kevinjohn/oss-adonisjs-origin-guard.git"
   },
   "devDependencies": {
+    "@adonisjs/assembler": "^8.6.0",
     "@adonisjs/core": "^7.0.1",
     "@adonisjs/eslint-config": "^3.0.0",
     "@adonisjs/prettier-config": "^1.4.5",
     "@adonisjs/tsconfig": "^2.0.0",
     "@japa/assert": "^4.2.0",
     "@japa/expect-type": "^2.0.4",
+    "@japa/file-system": "^3.0.0",
     "@japa/runner": "^5.3.0",
     "@poppinss/ts-exec": "^1.5.1",
     "@types/node": "^24.0.0",
     "c8": "^12.0.0",
+    "copyfiles": "^2.4.1",
     "eslint": "^10.14.0",
     "prettier": "^3.8.1",
+    "reflect-metadata": "^0.2.2",
     "tsdown": "^0.23.4",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
+    "@adonisjs/assembler": "^8.0.0",
     "@adonisjs/core": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@adonisjs/assembler": {
+      "optional": true
+    }
   },
   "tsdown": {
     "entry": [
       "./index.ts",
-      "./src/types.ts"
+      "./src/types.ts",
+      "./src/origin_guard_middleware.ts",
+      "./stubs/main.ts"
     ],
     "outDir": "./build",
     "clean": true,

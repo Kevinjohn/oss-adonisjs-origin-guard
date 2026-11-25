@@ -1,53 +1,56 @@
 # US-ORIGIN-05 — Install the origin-check middleware and validate settings before serving requests
 
-As an application developer, I want the HTTP kernel to evaluate my trust settings during startup so that a configuration error surfaces before the first write.
+As an application developer, I want Ace to install the origin-check middleware and the application to validate my trust settings during boot so that errors surface before the first write.
 
 **Status:** Operator.
-**Access:** Developer with control of the host application, its dependencies and its HTTP kernel.
-**Entry:** Install the GitHub release tarball and register the returned middleware class with `server.use`. In v0.4.0, invalid origin configuration throws `InvalidArgumentsException` ([guide](../README.md#configuration-errors)).
-**Documentation:** [Installation and host wiring](../README.md#install).
-**Source:** [Package exports](../index.ts), [type entry](../src/types.ts), [manifest](../package.json).
-**Coverage:** [Web startup fixture](../tests/origins/origin_check/boot.spec.ts), which boots a host from the source, and [packed consumer checks](../bin/smoke_packed_package.sh), which check the packed types and construction without booting a host.
+**Access:** Developer who controls the host's installation and configuration.
+**Entry:** Install a tarball built from the current source, then run `node ace configure @kevinjohn/adonisjs-origin-guard` from the app.
+**Documentation:** [Installation and host settings](../README.md#install).
+**Source:** [Configure hook](../configure.ts), [config stub](../stubs/config/origin_guard.stub), [defineConfig](../src/define_config.ts), [middleware](../src/origin_guard_middleware.ts).
+**Coverage:** [Scratch application and startup tests](../tests/configure.spec.ts) and [packed consumer checks](../bin/smoke_packed_package.sh).
 
 ## Acceptance criteria
 
-- The documented release installation targets Node 24+ and AdonisJS core 7. `createOriginGuard` and `createOriginCheck` are the same factory and the root and `./types` expose the same declarations for `OriginGuardConfig`, `PublicOrigin` and `UnsafeRequestHeaders`. There is no provider or configure hook.
-- The host declares required `APP_URL` and optional `CORS_ORIGINS` in its environment schema. Its shared module validates the former with `NODE_ENV` and passes an empty string to the list parser when the latter is omitted.
-- The kernel eagerly imports that module and registers a lazy middleware import ahead of handlers that act on writes. In the documented wiring, invalid values rejected by the origin helpers stop startup before the HTTP listener without echoing the rejected value. An invalid public URL names its setting and a malformed list entry its position; a `*` entry reports neither. The operator corrects the setting and restarts.
-- The module is imported by a preload file rather than living in `config/`, so the validation runs with the HTTP kernel, in the environments its preload entry lists, and not in every process that boots the application.
-- With valid settings the fixture starts. On its POST endpoint the tested foreign origin receives 403, and the tested public and listed origins reach the handler and receive 200. With `CORS_ORIGINS` omitted the host starts with an empty allowlist. Of the three explicit origins in the fixture, only the public origin is admitted. The [header fallback](US-ORIGIN-01-refuse-cross-site-writes.md) still applies to requests with no or empty Origin. The host owns registration and the handler's success response.
-- Hosts can call the exported parsing functions independently of middleware registration.
+| Input                          | Control                 | Required/default/conditions                                                                                                                   |
+| ------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ORIGIN_GUARD_PUBLIC_ORIGIN`   | App environment setting | Required. No default. Canonical origin; [US-ORIGIN-02](US-ORIGIN-02-validate-public-origin.md) describes the HTTPS policy.                    |
+| `ORIGIN_GUARD_ALLOWED_ORIGINS` | App environment setting | Optional. If omitted or empty, trusts no additional origins. [US-ORIGIN-03](US-ORIGIN-03-parse-trusted-origins.md) describes the list syntax. |
+
+- Installation requires Node 24+ and AdonisJS core 7. The Ace configure command uses the host's assembler to create `config/origin_guard.ts`, add environment schema entries and register the lazy server middleware.
+- Rerunning the command preserves host edits to the config and existing environment values without duplicating generated entries. The hook places the middleware at the start of the server stack on the first run.
+- The application loads the config at boot, including for console processes that boot the app. An invalid configured origin causes `InvalidArgumentsException` before startup completes. Errors name the config key and withhold the rejected value. The operator corrects the setting and retries.
+- With valid settings, POSTs with the public origin or a listed origin reach the fixture handler. A foreign origin receives 403 without reaching the handler. [US-ORIGIN-01](US-ORIGIN-01-refuse-cross-site-writes.md) describes the full request decision.
 
 ## User flow
 
 ```mermaid
 flowchart TD
-    A["Install release and wire host middleware"] --> S["Set public URL and optional trusted origins"]
+    A["Install the tarball and run Ace configure"] --> S["Set the public origin and any additional trusted origins"]
     S --> B{"Settings valid at boot?"}
-    B -->|No| C["See configuration error; correct settings and restart"]
+    B -->|No| C["Read the configuration error"]
     C --> S
-    B -->|Yes| D["HTTP listener starts"]
-    D --> E{"Request admitted by origin check?"}
+    B -->|Yes| D["Start the web or console process"]
+    D -->|Web request| E{"Request admitted by origin check?"}
     E -->|Yes| F["Request reaches remaining stack"]
-    E -->|No| G["Receive 403; handler does not run"]
+    E -->|No| G["Receive 403"]
 ```
 
 ## Code flow
 
-Scope: host startup fixture and package middleware; the host owns registration, listener and route response.
-
 ```mermaid
 flowchart TD
-    A["Web kernel imports origin_config"] --> V["Env.create in start/env.ts"]
-    V -->|Throws| C["Boot stops before listener"]
-    V -->|Returns| B["resolvePublicOrigin, then parseOrigins"]
-    B -->|Throws| C
-    B -->|Returns| D["server.use registers lazy middleware"]
-    D --> L["Boot server, start HTTP listener"]
-    L --> E["Lazy middleware module consumes evaluated config via createOriginCheck"]
-    E --> M["On requests, OriginGuardMiddleware.handle applies US-ORIGIN-01"]
-    M -->|Admitted POST /write| G["Fixture handler returns 200"]
-    M -->|Refused POST /write| H["response.forbidden returns 403"]
+    A["Ace runs configure(command)"] --> C["Codemods scaffold config, define env settings and register server middleware"]
+    C --> E["Host sets public origin and optional allowlist"]
+    E --> I["AdonisJS loads config/origin_guard.ts during app.boot()"]
+    I --> V["Env.create validates the environment schema"]
+    V -->|Returns| B["defineConfig validates publicOrigin and allowedOrigins"]
+    V -->|Throws| X["App boot fails"]
+    B -->|Throws| X
+    B -->|Returns| S["Config stores the validated settings"]
+    S -->|Console| P["Console process starts"]
+    S -->|Web| D["App loads the kernel preload and starts HTTP"]
+    D --> M["Container resolves OriginGuardMiddleware with Config"]
+    M --> R["OriginGuardMiddleware.handle applies US-ORIGIN-01"]
 ```
 
-**Code references:** [Fixture kernel](../tests/origins/origin_check/fixture/start/kernel.ts), [environment schema](../tests/origins/origin_check/fixture/start/env.ts), [shared config](../tests/origins/origin_check/fixture/start/origin_config.ts), [middleware module](../tests/origins/origin_check/fixture/start/middleware.ts), [boot harness](../tests/origins/origin_check/boot.spec.ts), [shared request flow](US-ORIGIN-01-refuse-cross-site-writes.md#code-flow).
+**Code references:** [Configure hook](../configure.ts), [config stub](../stubs/config/origin_guard.stub), [defineConfig](../src/define_config.ts), [boot fixture](../tests/fixtures/application/boot.ts), [request flow](US-ORIGIN-01-refuse-cross-site-writes.md#code-flow).

@@ -1,8 +1,17 @@
+/** Host-provided settings consumed by `defineConfig`. */
+export interface OriginGuardOptions {
+  /** The application's canonical public origin. */
+  publicOrigin: string
+  /** Additional origins as a comma-separated list. */
+  allowedOrigins?: string
+  /** The application's runtime environment, which determines the HTTPS policy. */
+  environment: 'production' | 'development' | 'test'
+}
+
 /** The origins an unsafe request may come from, in the serialized form browsers send. */
 export interface OriginGuardConfig {
   /**
-   * The validated origin the application is served from, in the serialized form browsers send.
-   * Host code should obtain it from `resolvePublicOrigin` during startup.
+   * The public origin in the serialized form browsers send.
    */
   publicOrigin: string
   /**

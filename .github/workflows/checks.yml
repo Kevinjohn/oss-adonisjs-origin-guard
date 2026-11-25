@@ -29,7 +29,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
-      # The same packed-package smoke the release gate runs, so export-map and alias breaks fail here.
+      # The same packed-package smoke the release gate runs, so export-map and setup breaks fail here.
       - name: Smoke the packed package
         run: |
           rm -rf tmp/checks && mkdir -p tmp/checks

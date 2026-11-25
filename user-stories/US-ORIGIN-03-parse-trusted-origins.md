@@ -3,8 +3,8 @@
 As an application operator, I want a comma-separated list of trusted origins validated and normalised when the application starts so that CORS and the origin check trust exactly the origins I meant, never a wildcard.
 
 **Status:** Operator.
-**Access:** Operator who sets the host's trusted-origin setting (for example `CORS_ORIGINS`); host code passes it in.
-**Entry:** `parseOrigins(list)`; host code may call it independently or from the documented module eagerly imported by the HTTP kernel before lazy middleware registration.
+**Access:** Operator who sets `ORIGIN_GUARD_ALLOWED_ORIGINS`; the application reads the setting in `config/origin_guard.ts`.
+**Entry:** `parseOrigins(list)`; `defineConfig` calls it during application boot. Hosts may also call it directly.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -36,7 +36,7 @@ flowchart TD
 
 ## Code flow
 
-Scope: package parsing; passing the result to CORS or `createOriginGuard` is host-owned.
+Scope: package parsing. `defineConfig` uses its return value for the write allowlist; reuse in CORS is host-owned.
 
 ```mermaid
 flowchart TD
@@ -52,4 +52,4 @@ flowchart TD
     H --> I
 ```
 
-**Code references:** [parseOrigins](../src/origins.ts).
+**Code references:** [defineConfig](../src/define_config.ts), [parseOrigins](../src/origins.ts).

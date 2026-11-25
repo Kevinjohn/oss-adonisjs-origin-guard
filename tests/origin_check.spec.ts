@@ -1,8 +1,11 @@
+import 'reflect-metadata'
 import { test } from '@japa/runner'
 import { HttpContextFactory, RequestFactory } from '@adonisjs/core/factories/http'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
-import { createOriginCheck, createOriginGuard, isTrustedUnsafeOrigin } from '../index.ts'
+import { Config } from '@adonisjs/core/config'
+import { isTrustedUnsafeOrigin } from '../index.ts'
+import OriginGuardMiddleware from '../src/origin_guard_middleware.ts'
 
 const config = {
   publicOrigin: 'https://wayne.example',
@@ -95,19 +98,23 @@ test.group('isTrustedUnsafeOrigin', () => {
   })
 })
 
-test.group('createOriginGuard', () => {
-  test('is the same function as the root createOriginCheck alias', ({ assert }) => {
-    assert.strictEqual(createOriginCheck, createOriginGuard)
-  })
+test.group('OriginGuardMiddleware', () => {
+  const middleware = new OriginGuardMiddleware(new Config({ origin_guard: config }))
 
-  const OriginCheck = createOriginGuard(config)
+  test('refuses a write when configuration is absent', async ({ assert }) => {
+    const ctx = makeRequestContext('POST', { 'sec-fetch-site': 'same-origin' })
+    await new OriginGuardMiddleware(new Config({})).handle(ctx, async () => {
+      assert.fail('Unexpectedly reached the handler without configuration')
+    })
+    assert.equal(ctx.response.getStatus(), 403)
+  })
 
   test('POST {name}')
     .with(cases)
     .run(async ({ assert }, { headers, trusted }) => {
       const ctx = makeRequestContext('POST', headers)
       let reached = false
-      await new OriginCheck().handle(ctx, async () => {
+      await middleware.handle(ctx, async () => {
         reached = true
       })
       assert.equal(reached, trusted)
@@ -123,7 +130,7 @@ test.group('createOriginGuard', () => {
     .with(['GET', 'HEAD', 'OPTIONS'])
     .run(async ({ assert }, method) => {
       let reached = false
-      await new OriginCheck().handle(
+      await middleware.handle(
         makeRequestContext(method, { origin: 'https://lexcorp.example' }),
         async () => {
           reached = true
@@ -137,7 +144,7 @@ test.group('createOriginGuard', () => {
     .run(async ({ assert }, method) => {
       const ctx = makeRequestContext(method, { origin: 'https://lexcorp.example' })
       let reached = false
-      await new OriginCheck().handle(ctx, async () => {
+      await middleware.handle(ctx, async () => {
         reached = true
       })
       assert.isFalse(reached)

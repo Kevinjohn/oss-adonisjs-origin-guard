@@ -11,8 +11,10 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - index.ts
+      - configure.ts
       - tsconfig.json
       - 'src/**'
+      - 'stubs/**'
       - 'tests/**'
       - bin/test.ts
       - .github/workflows/compat.yml

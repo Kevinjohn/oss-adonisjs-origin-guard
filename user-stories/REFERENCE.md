@@ -2,17 +2,17 @@
 
 ## Actors and boundaries
 
-- **Application developer**: registers the origin check as server middleware and passes the validated origins in. The package provides no provider, routes, UI or `configure` hook, and reads no environment variable.
+- **Application developer**: runs the Ace configure hook and owns the origin settings in the generated config.
 - **Operator**: sets the public URL and trusted-origin settings the host passes to US-ORIGIN-02/03, and places any reverse proxy for US-ORIGIN-04.
 - **Browser client**: sends `Origin` and `Sec-Fetch-Site`, which the middleware reads for every method other than `GET`, `HEAD` and `OPTIONS`.
 
 ## Shared source map
 
 - Public exports: [`index.ts`](../index.ts).
-- Origin-check middleware and decision function: [`src/origin_check.ts`](../src/origin_check.ts).
+- Origin-check middleware and decision function: [middleware](../src/origin_guard_middleware.ts), [origin decision](../src/origin_check.ts).
 - Public origin and trusted origin parsing: [`src/origins.ts`](../src/origins.ts).
 - Private-peer check: [`src/private_peer.ts`](../src/private_peer.ts).
-- Contracts and host wiring examples: [README](../README.md). See also the [executable startup fixture](../tests/origins/origin_check/boot.spec.ts) and [packed consumer check](../bin/smoke_packed_package.sh).
+- Contracts and host wiring examples: [README](../README.md). See also the [executable startup fixture](../tests/configure.spec.ts) and [packed consumer check](../bin/smoke_packed_package.sh).
 - Test evidence: [`tests/origin_check.spec.ts`](../tests/origin_check.spec.ts), [`tests/origins.spec.ts`](../tests/origins.spec.ts), [`tests/private_peer.spec.ts`](../tests/private_peer.spec.ts).
 
 ## Availability

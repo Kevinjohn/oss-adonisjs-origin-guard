@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Breaking: use `node ace configure @kevinjohn/adonisjs-origin-guard` to scaffold `config/origin_guard.ts`
+  and register the server middleware from `@kevinjohn/adonisjs-origin-guard/origin_guard_middleware`.
+  This replaces the `createOriginGuard` and `createOriginCheck` middleware factories.
+- Configure the required public origin and optional write allowlist in the application. `defineConfig`
+  validates both when AdonisJS loads configuration, including for console processes that boot
+  the application. The request decision, refusal response and standalone helpers are unchanged.
+
 ## 0.4.0 - 2026-11-24
 
 - `parseOrigins` and `resolvePublicOrigin` now throw AdonisJS core's `InvalidArgumentsException`

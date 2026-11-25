@@ -4,9 +4,9 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 **Status:** Current.
 **Access:** Application developer who controls `start/kernel.ts` and the host's origin settings. Applies to every request through the server middleware stack. Hosts can also call the exported decision helper directly.
-**Entry:** `createOriginCheck({ publicOrigin, allowedOrigins })` (also exported as `createOriginGuard`), default-exported from a host middleware file and registered with `server.use`. `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` returns the same decision as a boolean, given the `Origin` and `Sec-Fetch-Site` values (both optional); it does not check the method or send a response.
+**Entry:** [Ace configure](US-ORIGIN-05-install-and-start.md) registers the package middleware in `start/kernel.ts`. Hosts can call `isTrustedUnsafeOrigin({ origin, fetchSite }, config)` directly to get a boolean for the two optional headers.
 **Documentation:** [Refuse cross-site writes](../README.md#refuse-cross-site-writes).
-**Source:** [origin check](../src/origin_check.ts).
+**Source:** [Middleware](../src/origin_guard_middleware.ts) and [origin decision](../src/origin_check.ts).
 **Coverage:** [Origin-check tests](../tests/origin_check.spec.ts).
 
 ## Acceptance criteria
@@ -42,14 +42,16 @@ flowchart TD
 
 ## Code flow
 
-Scope: the package middleware and standalone origin decision. Registration, allowed origins and the Shield configuration are host-owned.
+Scope: the package middleware and standalone origin decision. The application owns its trusted origins and Shield configuration.
 
 ```mermaid
 flowchart TD
-    P["createOriginGuard(config) returns OriginGuardMiddleware"] --> A["OriginGuardMiddleware.handle(ctx, next)"]
+    P["OriginGuardMiddleware reads origin_guard from the injected Config"] --> A["OriginGuardMiddleware.handle(ctx, next)"]
     A --> B{"request.method() is GET, HEAD or OPTIONS?"}
     B -->|Yes| N["return next()"]
-    B -->|No| R["Read origin and sec-fetch-site via request.header"]
+    B -->|No| X{"Origin configuration present?"}
+    X -->|No| H
+    X -->|Yes| R["Read origin and sec-fetch-site via request.header"]
     R --> C["isTrustedUnsafeOrigin({ origin, fetchSite }, config)"]
     A2["Host directly calls isTrustedUnsafeOrigin(headers, config)"] --> C
     C --> D{"origin empty or absent?"}
@@ -63,4 +65,4 @@ flowchart TD
     G -->|No| H["response.forbidden({ error: 'Cross-site request rejected.' })"]
 ```
 
-**Code references:** [createOriginGuard](../src/origin_check.ts#L52), [isTrustedUnsafeOrigin](../src/origin_check.ts#L24), [OriginGuardConfig](../src/types.ts).
+**Code references:** [OriginGuardMiddleware](../src/origin_guard_middleware.ts), [isTrustedUnsafeOrigin](../src/origin_check.ts), [OriginGuardConfig](../src/types.ts).

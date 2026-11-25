@@ -1,0 +1,11 @@
+{{{
+  exports({ to: app.configPath('origin_guard.ts') })
+}}}
+import env from '#start/env'
+import { defineConfig } from '@kevinjohn/adonisjs-origin-guard'
+
+export default defineConfig({
+  publicOrigin: env.get('ORIGIN_GUARD_PUBLIC_ORIGIN'),
+  allowedOrigins: env.get('ORIGIN_GUARD_ALLOWED_ORIGINS'),
+  environment: env.get('NODE_ENV'),
+})

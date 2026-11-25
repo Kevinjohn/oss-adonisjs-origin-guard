@@ -1,6 +1,6 @@
 # User story catalogue
 
-Reviewed against source commit `69f25d7d3a0bf18676ea5bb97281a1049fde0f9d`, including package entry points, host integration, and startup and request refusal paths.
+Describes the package entry points, host integration, boot checks and request decisions in the unreleased source.
 
 ## Index
 
