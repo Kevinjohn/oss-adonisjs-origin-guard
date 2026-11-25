@@ -1,5 +1,5 @@
 import { test } from '@japa/runner'
-import { isPrivatePeer } from '../index.js'
+import { isPrivatePeer } from '../index.ts'
 
 test('isPrivatePeer covers loopback and private networks only', ({ assert }) => {
   for (const address of [

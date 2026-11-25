@@ -1,7 +1,7 @@
-import { createOriginGuard } from './src/origin_check.js'
+import { createOriginGuard } from './src/origin_check.ts'
 
-export { parseOrigins, resolvePublicOrigin } from './src/origins.js'
-export { createOriginGuard, isTrustedUnsafeOrigin } from './src/origin_check.js'
+export { parseOrigins, resolvePublicOrigin } from './src/origins.ts'
+export { createOriginGuard, isTrustedUnsafeOrigin } from './src/origin_check.ts'
 
 /**
  * Builds the same server middleware as `createOriginGuard`.
@@ -16,5 +16,5 @@ export { createOriginGuard, isTrustedUnsafeOrigin } from './src/origin_check.js'
  * ```
  */
 export const createOriginCheck = createOriginGuard
-export { isPrivatePeer } from './src/private_peer.js'
-export type { OriginGuardConfig, PublicOrigin, UnsafeRequestHeaders } from './src/types.js'
+export { isPrivatePeer } from './src/private_peer.ts'
+export type { OriginGuardConfig, PublicOrigin, UnsafeRequestHeaders } from './src/types.ts'

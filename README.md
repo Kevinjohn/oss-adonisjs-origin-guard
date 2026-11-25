@@ -7,11 +7,6 @@ Origin handling for an AdonisJS 7 application behind a browser:
   or send;
 - decide whether a proxy peer is on loopback or a private network.
 
-Requires Node 24 or later and `@adonisjs/core` 7. The package reads no environment variable; the
-host passes every value in. The host must declare `APP_URL` in `start/env.ts`, for example as
-`APP_URL: Env.schema.string()`, and optionally `CORS_ORIGINS: Env.schema.string.optional()`,
-before reading them from `#start/env`.
-
 ## Install
 
 Releases are GitHub release tarballs; the package is not on the npm registry.
@@ -20,13 +15,20 @@ Releases are GitHub release tarballs; the package is not on the npm registry.
 pnpm add https://github.com/Kevinjohn/oss-adonisjs-origin-guard/releases/download/v0.4.0/kevinjohn-adonisjs-origin-guard-0.4.0.tgz
 ```
 
-Manual middleware registration is the package convention; there is no provider or Ace configure hook.
+## Setup
+
+Installation currently requires manual middleware registration; there is no provider or Ace configure hook.
 All host trust settings remain host-owned. Invalid settings fail startup without echoing the
 rejected value. The [origin configuration helpers](#parse-origins) are also usable without
 middleware registration. Since v0.3.0, public types are available from
 `@kevinjohn/adonisjs-origin-guard/types`.
 
-## Refuse cross-site writes
+## Configuration
+
+The package reads no environment variable; the
+host passes every value in. The host must declare `APP_URL` in `start/env.ts`, for example as
+`APP_URL: Env.schema.string()`, and optionally `CORS_ORIGINS: Env.schema.string.optional()`,
+before reading them from `#start/env`.
 
 Validate the host settings in a module shared by the eagerly loaded kernel and the middleware:
 
@@ -40,6 +42,20 @@ export const originCheckConfig = {
   allowedOrigins: parseOrigins(env.get('CORS_ORIGINS', '')),
 }
 ```
+
+Reading `env` in `start/` rather than `config/` is a deliberate exception to the AdonisJS
+convention. AdonisJS imports every `config/` file in every process that boots the application,
+with no way to limit them by environment, so validating there would let an origin setting stop
+processes that never serve HTTP. A preload file's `adonisrc.ts` entry can list the environments it
+runs in, so the validation follows the HTTP kernel: the startup fixture lists
+`environment: ['web']`, and a kernel entry with no list also runs in tests and in Ace commands that
+start the application. If a `config/` file reads the raw values instead, keep the
+`resolvePublicOrigin` and `parseOrigins` calls in the preloaded module so validation still runs
+with the kernel.
+
+## Usage
+
+### Refuse cross-site writes
 
 Import that module from `start/kernel.ts` before registering the lazy middleware. AdonisJS imports
 the kernel preload file when the application starts; this eager import makes invalid origin
@@ -64,16 +80,6 @@ import '#start/origin_config'
 server.use([() => import('#middleware/origin_check_middleware')])
 ```
 
-Reading `env` in `start/` rather than `config/` is a deliberate exception to the AdonisJS
-convention. AdonisJS imports every `config/` file in every process that boots the application,
-with no way to limit them by environment, so validating there would let an origin setting stop
-processes that never serve HTTP. A preload file's `adonisrc.ts` entry can list the environments it
-runs in, so the validation follows the HTTP kernel: the startup fixture lists
-`environment: ['web']`, and a kernel entry with no list also runs in tests and in Ace commands that
-start the application. If a `config/` file reads the raw values instead, keep the
-`resolvePublicOrigin` and `parseOrigins` calls in the preloaded module so validation still runs
-with the kernel.
-
 The origin-check middleware lets `GET`, `HEAD` and `OPTIONS` through. For every other method:
 
 | Request                                                     | Outcome  |
@@ -97,7 +103,7 @@ configuration; it does not parse or revalidate the configured origins on each re
 Turn off Shield's token-based CSRF if this middleware replaces it. A client that sends neither header,
 such as a script using a bare HTTP library, must send `Origin`.
 
-## Parse origins
+### Parse origins
 
 - `parseOrigins(list)` is a public package-root helper that validates a comma-separated configuration
   string and returns canonical HTTP(S) origins as a `string[]`. It trims each entry and skips
@@ -114,13 +120,7 @@ such as a script using a bare HTTP library, must send `Origin`.
   `localhost`, `127.0.0.1` and `[::1]` in development and test. `variable` names the setting in the
   error message.
 
-### Configuration errors
-
-Both origin helpers throw `InvalidArgumentsException` from
-`@adonisjs/core/exceptions` when configuration is invalid. Applications can recognize these failures with
-`error instanceof InvalidArgumentsException`.
-
-## Trust a proxy
+### Trust a proxy
 
 `isPrivatePeer(address)` is true for loopback and private networks (`127.0.0.0/8`, `10.0.0.0/8`,
 `172.16.0.0/12`, `192.168.0.0/16`, `::1`, `fc00::/7`), including IPv4-mapped IPv6:
@@ -139,6 +139,16 @@ stopping at the first untrusted address. This helper checks address ranges, not 
 use it when your network prevents untrusted clients from reaching the app through a trusted private
 address. If only specific proxies are trusted, provide a predicate for those peers instead. The
 application still needs network rules that control who can supply forwarded headers.
+
+## Configuration errors
+
+Both origin helpers throw `InvalidArgumentsException` from
+`@adonisjs/core/exceptions` when configuration is invalid. Applications can recognize these failures with
+`error instanceof InvalidArgumentsException`.
+
+## Supported AdonisJS versions
+
+Requires Node 24 or later and `@adonisjs/core` 7.
 
 ## Development
 

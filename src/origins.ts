@@ -1,5 +1,5 @@
 import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
-import type { PublicOrigin } from './types.js'
+import type { PublicOrigin } from './types.ts'
 
 /**
  * Parses a comma-separated list of origins with the WHATWG `URL` parser. Blank entries are skipped;

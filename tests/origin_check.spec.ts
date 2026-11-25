@@ -2,7 +2,7 @@ import { test } from '@japa/runner'
 import { HttpContextFactory, RequestFactory } from '@adonisjs/core/factories/http'
 import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
-import { createOriginCheck, createOriginGuard, isTrustedUnsafeOrigin } from '../index.js'
+import { createOriginCheck, createOriginGuard, isTrustedUnsafeOrigin } from '../index.ts'
 
 const config = {
   publicOrigin: 'https://wayne.example',
