@@ -46,7 +46,8 @@
   `resolvePublicOrigin` helper. Their pin update requires no Origin Guard config, Ace configure
   step or middleware change.
 
-See [Consumer adoption](./DECISIONS.md#consumer-adoption) for the integration details.
+See [Consumer adoption](https://github.com/Kevinjohn/oss-adonisjs-origin-guard/blob/8d3a782f587a11ef69a7a7e6b007e6ae284ecba7/DECISIONS.md#consumer-adoption)
+for the integration details.
 
 ## 0.4.0 - 2026-11-24
 
