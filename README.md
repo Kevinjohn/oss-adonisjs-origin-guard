@@ -32,6 +32,11 @@ The configure command needs the application's `@adonisjs/assembler` development 
   middleware stack in `start/kernel.ts`.
 
 You can rerun the command after editing the generated config or filling in the environment values.
+An environment setting already present in either `.env` or `.env.example` skips placeholder
+insertion for that setting in both files.
+
+[Existing application adoption](./DECISIONS.md#consumer-adoption) describes which integrations need
+to change when the next release ships.
 
 ## Configuration
 

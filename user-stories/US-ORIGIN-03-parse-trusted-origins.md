@@ -4,7 +4,7 @@ As an application operator, I want a comma-separated list of trusted origins val
 
 **Status:** Operator.
 **Access:** Operator who sets `ORIGIN_GUARD_ALLOWED_ORIGINS`; the application reads the setting in `config/origin_guard.ts`.
-**Entry:** `parseOrigins(list)`; `defineConfig` calls it during application boot. Hosts may also call it directly.
+**Entry:** `parseOrigins(list)` is the standalone entry point. `defineConfig` uses the same parser when the application boots.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -40,7 +40,9 @@ Scope: package parsing. `defineConfig` uses its return value for the write allow
 
 ```mermaid
 flowchart TD
-    A["parseOrigins(list)"] --> B["Split, trim and retain original positions; filter blanks"]
+    A["parseOrigins(list)"] --> P["parseOriginList"]
+    Y["defineConfig supplies the config key for diagnostics"] --> P
+    P --> B["Split, trim and retain original positions; filter blanks"]
     B --> I{"Next remaining entry?"}
     I -->|No| J["Return array of origins"]
     I -->|Yes| C{"origin === '*'?"}

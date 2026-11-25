@@ -136,7 +136,10 @@ test.group('Ace configure and AdonisJS startup', (group) => {
     assert.include(envSchema, 'ORIGIN_GUARD_PUBLIC_ORIGIN: Env.schema.string()')
     assert.include(envSchema, 'ORIGIN_GUARD_ALLOWED_ORIGINS: Env.schema.string.optional()')
     const kernel = read('start/kernel.ts')
+    const existingMiddlewarePath = './existing_middleware.js'
     assert.include(kernel, middlewarePath)
+    assert.include(kernel, existingMiddlewarePath)
+    assert.isBelow(kernel.indexOf(middlewarePath), kernel.indexOf(existingMiddlewarePath))
     for (const path of ['.env', '.env.example']) {
       assert.include(read(path), 'ORIGIN_GUARD_PUBLIC_ORIGIN=')
       assert.include(read(path), 'ORIGIN_GUARD_ALLOWED_ORIGINS=')

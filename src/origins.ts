@@ -19,6 +19,10 @@ import type { PublicOrigin } from './types.ts'
  * ```
  */
 export function parseOrigins(list: string): string[] {
+  return parseOriginList(list)
+}
+
+export function parseOriginList(list: string, errorPrefix = ''): string[] {
   return list
     .split(',')
     .map((origin, index) => ({ origin: origin.trim(), position: index + 1 }))
@@ -26,7 +30,7 @@ export function parseOrigins(list: string): string[] {
     .map(({ origin, position }) => {
       if (origin === '*') {
         throw new InvalidArgumentsException(
-          'CORS requires explicit origins when credentials are enabled'
+          `${errorPrefix}CORS requires explicit origins when credentials are enabled`
         )
       }
       let parsed: URL | undefined
@@ -45,7 +49,7 @@ export function parseOrigins(list: string): string[] {
         parsed.hash
       ) {
         throw new InvalidArgumentsException(
-          `Invalid CORS origin at position ${position}: expected a bare HTTP(S) origin`
+          `${errorPrefix}Invalid CORS origin at position ${position}: expected a bare HTTP(S) origin`
         )
       }
       return parsed.origin

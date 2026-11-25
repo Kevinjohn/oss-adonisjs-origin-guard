@@ -1,5 +1,5 @@
 import { InvalidArgumentsException } from '@adonisjs/core/exceptions'
-import { parseOrigins, resolvePublicOrigin } from './origins.ts'
+import { parseOriginList, resolvePublicOrigin } from './origins.ts'
 import type { OriginGuardConfig, OriginGuardOptions } from './types.ts'
 
 /**
@@ -34,10 +34,8 @@ export function defineConfig(options: OriginGuardOptions): OriginGuardConfig {
   if (typeof allowedOrigins !== 'string') {
     throw new InvalidArgumentsException('config/origin_guard.ts allowedOrigins must be a string')
   }
-  try {
-    return { publicOrigin: origin, allowedOrigins: parseOrigins(allowedOrigins) }
-  } catch (error) {
-    if (!(error instanceof InvalidArgumentsException)) throw error
-    throw new InvalidArgumentsException(`config/origin_guard.ts allowedOrigins: ${error.message}`)
+  return {
+    publicOrigin: origin,
+    allowedOrigins: parseOriginList(allowedOrigins, 'config/origin_guard.ts allowedOrigins: '),
   }
 }
