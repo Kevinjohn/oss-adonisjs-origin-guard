@@ -3,8 +3,8 @@
 As an application operator, I want a comma-separated list of trusted origins validated and normalised when the application starts so that CORS and the origin check trust exactly the origins I meant, never a wildcard.
 
 **Status:** Operator.
-**Access:** Operator who sets the host's trusted-origin setting (for example `CORS_ORIGINS`); host code passes it in.
-**Entry:** `parseOrigins(list)`; host code may call it independently or from the documented module eagerly imported by the HTTP kernel before lazy middleware registration.
+**Access:** Operator who sets `ORIGIN_GUARD_ALLOWED_ORIGINS`; the application reads the setting in `config/origin_guard.ts`.
+**Entry:** `parseOrigins(list)` is the standalone entry point. `defineConfig` uses the same parser when the application boots.
 **Documentation:** [Parse origins](../README.md#parse-origins).
 **Source:** [origins](../src/origins.ts).
 **Coverage:** [Origin tests](../tests/origins.spec.ts).
@@ -36,11 +36,13 @@ flowchart TD
 
 ## Code flow
 
-Scope: package parsing; passing the result to CORS or `createOriginGuard` is host-owned.
+Scope: package parsing. `defineConfig` uses its return value for the write allowlist; reuse in CORS is host-owned.
 
 ```mermaid
 flowchart TD
-    A["parseOrigins(list)"] --> B["Split, trim and retain original positions; filter blanks"]
+    A["parseOrigins(list)"] --> P["parseOriginList"]
+    Y["defineConfig supplies the config key for diagnostics"] --> P
+    P --> B["Split, trim and retain original positions; filter blanks"]
     B --> I{"Next remaining entry?"}
     I -->|No| J["Return array of origins"]
     I -->|Yes| C{"origin === '*'?"}
@@ -52,4 +54,4 @@ flowchart TD
     H --> I
 ```
 
-**Code references:** [parseOrigins](../src/origins.ts).
+**Code references:** [defineConfig](../src/define_config.ts), [parseOrigins](../src/origins.ts).
