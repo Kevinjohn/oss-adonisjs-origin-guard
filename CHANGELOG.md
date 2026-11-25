@@ -2,12 +2,51 @@
 
 ## Unreleased
 
-- Breaking: use `node ace configure @kevinjohn/adonisjs-origin-guard` to scaffold `config/origin_guard.ts`
-  and register the server middleware from `@kevinjohn/adonisjs-origin-guard/origin_guard_middleware`.
-  This replaces the `createOriginGuard` and `createOriginCheck` middleware factories.
-- Configure the required public origin and optional write allowlist in the application. `defineConfig`
-  validates both when AdonisJS loads configuration, including for console processes that boot
-  the application. The request decision, refusal response and standalone helpers are unchanged.
+### Breaking changes
+
+- Removed `createOriginGuard` and `createOriginCheck`. Use the package-root `defineConfig` in
+  `config/origin_guard.ts` and register the server middleware from
+  `@kevinjohn/adonisjs-origin-guard/origin_guard_middleware`.
+- `defineConfig` takes a required `publicOrigin`, an optional comma-separated `allowedOrigins`
+  list and an explicit `environment` (`development`, `production` or `test`). The app supplies
+  the public origin explicitly. The package never infers it from request headers or grants
+  default trust to additional origins.
+- Origin settings now validate eagerly whenever AdonisJS boots the application, including web
+  and console processes. Previously, eager validation followed the host's HTTP kernel preload
+  and could be scoped to web boot. Set valid values for Ace commands that boot the app, too.
+- The request decision and standalone helpers are unchanged. `GET`, `HEAD` and `OPTIONS` still
+  pass through, and rejected writes still return `403` with
+  `{ "error": "Cross-site request rejected." }`.
+
+### Install and adopt
+
+- To try the unreleased setup, run `pnpm build && pnpm pack` in this repository, then install the
+  resulting tarball in the app with `pnpm add /absolute/path/to/archive.tgz`. For a fresh
+  middleware setup, run `node ace configure @kevinjohn/adonisjs-origin-guard` with
+  `@adonisjs/assembler` installed in the app. It creates `config/origin_guard.ts`, adds validation
+  for `ORIGIN_GUARD_PUBLIC_ORIGIN` and `ORIGIN_GUARD_ALLOWED_ORIGINS` to `start/env.ts`, and
+  prepends the middleware to the server stack. It adds blank placeholders to existing `.env` and
+  `.env.example` files only for keys absent from both. Fill in the public origin and any additional
+  write origins before booting the app. The scaffold passes `NODE_ENV` as `environment`.
+- Capacity Lens and the Starter Examples remain on the released v0.4.0 tarball until they
+  choose to update their pins after the next release.
+- For the manual Capacity Lens migration, add `apps/backend/config/origin_guard.ts` and call
+  `defineConfig` with
+  `publicOrigin: publicOrigin.origin` from `#config/public_origin`,
+  `allowedOrigins: corsOrigins.join(',')` using `corsOrigins` from `#config/cors`, and
+  `environment: env.get('NODE_ENV')` with `env` from `#start/env`. These inputs reuse
+  `CAPACITYLENS_PUBLIC_URL` or `APP_URL` and the CORS or development origins. This migration
+  needs no `ORIGIN_GUARD_*` settings or Ace configure step.
+- Register the middleware manually in Capacity Lens to preserve its position. Replace the local
+  import in `apps/backend/start/kernel.ts` with
+  `() => import('@kevinjohn/adonisjs-origin-guard/origin_guard_middleware')` in the existing
+  server-stack slot after security headers. Remove the factory wrapper at
+  `apps/backend/app/middleware/origin_guard_middleware.ts` and keep a single registration.
+- The API, Hypermedia, Inertia React and Inertia Vue Starter Examples use the standalone
+  `resolvePublicOrigin` helper. Their pin update requires no Origin Guard config, Ace configure
+  step or middleware change.
+
+See [Consumer adoption](./DECISIONS.md#consumer-adoption) for the integration details.
 
 ## 0.4.0 - 2026-11-24
 
