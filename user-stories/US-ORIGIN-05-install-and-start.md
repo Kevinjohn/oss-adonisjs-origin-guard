@@ -15,17 +15,22 @@ As an application developer, I want Ace to install the origin-check middleware a
 | ------------------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ORIGIN_GUARD_PUBLIC_ORIGIN`   | App environment setting | Required. No default. Canonical origin; [US-ORIGIN-02](US-ORIGIN-02-validate-public-origin.md) describes the HTTPS policy.                    |
 | `ORIGIN_GUARD_ALLOWED_ORIGINS` | App environment setting | Optional. If omitted or empty, trusts no additional origins. [US-ORIGIN-03](US-ORIGIN-03-parse-trusted-origins.md) describes the list syntax. |
+| `NODE_ENV`                     | App environment setting | Required by the generated config; `development`, `production` or `test`. It selects the public origin HTTPS policy.                           |
 
 - Installation requires Node 24+ and AdonisJS core 7. The Ace configure command uses the host's assembler to create `config/origin_guard.ts`, add environment schema entries and register the lazy server middleware.
+- If the host assembler is missing, configure logs an installation instruction, exits with code 1 and performs no codemods. Other import or codemod failures propagate; earlier completed changes are not rolled back.
 - Rerunning the command preserves host edits to the config and existing environment values without duplicating generated entries. The hook places the middleware at the start of the server stack on the first run.
-- The application loads the config at boot, including for console processes that boot the app. An invalid configured origin causes `InvalidArgumentsException` before startup completes. Errors name the config key and withhold the rejected value. The operator corrects the setting and retries.
+- `defineConfig` also rejects an unsupported `environment` or a non-string `allowedOrigins`; it validates the environment, then public origin, then allowlist. The application loads the config at boot, including for console processes that boot the app. An invalid configured origin causes `InvalidArgumentsException` before startup completes. Errors name the config key and withhold the rejected value. The operator corrects the setting and retries.
 - With valid settings, POSTs with the public origin or a listed origin reach the fixture handler. A foreign origin receives 403 without reaching the handler. [US-ORIGIN-01](US-ORIGIN-01-refuse-cross-site-writes.md) describes the full request decision.
 
 ## User flow
 
 ```mermaid
 flowchart TD
-    A["Install the tarball and run Ace configure"] --> S["Set the public origin and any additional trusted origins"]
+    A["Install the tarball and run Ace configure"] --> K{"Assembler available and configure succeeds?"}
+    K -->|No| L["Correct the setup error and retry"]
+    L --> A
+    K -->|Yes| S["Set the public origin and any additional trusted origins"]
     S --> B{"Settings valid at boot?"}
     B -->|No| C["Read the configuration error"]
     C --> S
@@ -39,7 +44,11 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["Ace runs configure(command)"] --> C["Codemods scaffold config, define env settings and register server middleware"]
+    A["Ace runs configure(command)"] --> Q{"Import assembler code transformer"}
+    Q -->|Missing assembler| Z["Log installation instruction; set exitCode 1 and return"]
+    Q -->|Other failure| Y["Rethrow error"]
+    Q -->|Success| C["Codemods scaffold config, define env settings and register server middleware"]
+    C -->|Failure| W["Error propagates; earlier changes may remain"]
     C --> E["Host sets public origin and optional allowlist"]
     E --> I["AdonisJS loads config/origin_guard.ts during app.boot()"]
     I --> V["Env.create validates the environment schema"]
