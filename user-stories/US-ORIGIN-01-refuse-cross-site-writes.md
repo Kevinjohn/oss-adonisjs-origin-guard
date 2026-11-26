@@ -20,6 +20,7 @@ As an application developer, I want browser writes from untrusted origins refuse
 
 - `GET`, `HEAD` and `OPTIONS` pass through without reading either header.
 - A non-empty Origin decides the outcome even when Sec-Fetch-Site disagrees. Any other method is accepted when `Origin` equals the public origin or an allowed origin exactly, or when `Origin` is absent or empty and `Sec-Fetch-Site` is `same-origin`.
+- If the middleware has no `origin_guard` configuration, unsafe requests are refused without reading the headers.
 - Every other write, including `Origin: null`, a `same-site` or `cross-site` fetch without `Origin`, and a request with neither header, is refused with `403` and `{ "error": "Cross-site request rejected." }`; the rest of the stack does not run.
 - `Host` and the request protocol are never consulted. A non-browser client without fetch metadata can supply a trusted `Origin`.
 - The host supplies validated configuration at startup. The middleware compares request headers with that configuration and does not revalidate configured origins per request.
@@ -31,7 +32,9 @@ As an application developer, I want browser writes from untrusted origins refuse
 flowchart TD
     A["Browser sends a request to the application"] --> B{"GET, HEAD or OPTIONS?"}
     B -->|Yes| C["Request continues through the middleware stack"]
-    B -->|No| D{"Origin present and not empty?"}
+    B -->|No| X{"Origin configuration present?"}
+    X -->|No| G
+    X -->|Yes| D{"Origin present and not empty?"}
     D -->|Yes| E{"Origin is the public origin or an allowed origin?"}
     D -->|No| F{"Sec-Fetch-Site is same-origin?"}
     E -->|Yes| C
