@@ -7,7 +7,7 @@ import { PassThrough } from 'node:stream'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from '@japa/runner'
-import { isAlive, captureChildOutput, waitForFile, waitForPid } from './child_process.js'
+import { isAlive, captureChildOutput, waitForFile, waitForPid } from './child_process.ts'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -49,6 +49,10 @@ async function makeCheckProcessFixture(options: FixtureOptions = {}): Promise<Fi
     await writeFile(path.join(root, 'bin/check_changed.ts'), await readFile(runnerPath))
     await writeFile(path.join(root, 'bin/check_changed_plan.ts'), await readFile(plannerPath))
     await writeFile(path.join(root, 'package.json'), '{"type":"module"}\n')
+    await writeFile(
+      path.join(root, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { rewriteRelativeImportExtensions: true } })
+    )
     await writeFile(path.join(root, 'README.md'), 'fixture baseline\n')
     await symlink(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'), 'dir')
 
@@ -127,6 +131,7 @@ async function makeCheckProcessFixture(options: FixtureOptions = {}): Promise<Fi
     const environment: NodeJS.ProcessEnv = {
       ...gitEnvironment,
       PATH: `${bin}${path.delimiter}${supportBin}`,
+      TS_EXEC_PWD: root,
     }
     delete environment.NODE_OPTIONS
     delete environment.CHECK_CHANGED_HANG
@@ -253,7 +258,9 @@ async function cleanupFixture(fixture: Fixture): Promise<void> {
 test('runs selected static checks normally and observes a missing command spawn error', async ({
   cleanup,
 }) => {
-  const normal = await makeCheckProcessFixture()
+  const normal = await makeCheckProcessFixture({
+    inheritedEnvironment: { TS_EXEC_PWD: undefined },
+  })
   cleanup(() => cleanupFixture(normal))
   const normalChild = launch(normal)
   const normalOutput = captureChildOutput(normalChild)
@@ -395,7 +402,7 @@ test('fixture removes its directory when setup fails', async () => {
   await assert.rejects(readFile(directory, 'utf8'), { code: 'ENOENT' })
 })
 
-test('fixture ignores hostile inherited Git configuration and Node preloads', async ({
+test('fixture ignores hostile inherited Git configuration, Node preloads and loader roots', async ({
   cleanup,
 }) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'origin-guard-hostile-settings-'))
@@ -414,6 +421,7 @@ test('fixture ignores hostile inherited Git configuration and Node preloads', as
       GIT_CONFIG_KEY_0: 'commit.gpgsign',
       GIT_CONFIG_VALUE_0: 'true',
       NODE_OPTIONS: `--require=${preload}`,
+      TS_EXEC_PWD: directory,
     },
   })
   cleanup(() => cleanupFixture(fixture))
