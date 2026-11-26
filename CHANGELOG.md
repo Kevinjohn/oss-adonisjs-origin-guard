@@ -49,6 +49,10 @@
 See [Consumer adoption](https://github.com/Kevinjohn/oss-adonisjs-origin-guard/blob/8d3a782f587a11ef69a7a7e6b007e6ae284ecba7/DECISIONS.md#consumer-adoption)
 for the integration details.
 
+### Maintenance
+
+- Require successful main CI for the release commit before packaging the GitHub release archive.
+
 ## 0.4.0 - 2026-11-24
 
 - `parseOrigins` and `resolvePublicOrigin` now throw AdonisJS core's `InvalidArgumentsException`
